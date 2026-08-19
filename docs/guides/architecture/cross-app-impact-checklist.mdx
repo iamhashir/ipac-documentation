@@ -1,0 +1,97 @@
+---
+title: Cross-application impact checklist
+sidebar_label: Cross-app impact checklist
+description: Work through this before changing anything in the shared IPAC backend.
+---
+
+# Cross-application impact checklist
+
+The backend is shared. This checklist exists so that a change made for one
+application does not silently break the other.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['website:docs/DEVELOPMENT.md', 'website:docs/ARCHITECTURE.md']}>
+  Derived from `website`'s own work order and architectural principles,
+  restructured as a checklist. It adds no new claims about the system.
+</Status>
+
+## When to use it
+
+Any time your change touches a shared object:
+
+- a table, column, or view
+- a row level security policy
+- a database function, RPC, or trigger
+- authentication or session behaviour
+- a storage bucket or its contents
+- an edge function
+
+If your change is confined to one application's components and styling, you do not
+need this. If you are unsure, you do.
+
+## The checklist
+
+**1. Identify every backend object you are touching.** Name the tables, views,
+functions, policies, triggers and buckets explicitly. If you cannot list them,
+you do not yet know what your change does.
+
+**2. Search both applications for each object.** Not just the one you are working
+in. A table name, function name or bucket name used in the other application
+means your change reaches it.
+
+**3. Inspect the triggers on those tables before changing any mutation.** Check
+the functions they call. See
+[Trigger-driven behaviour](./trigger-driven-behaviour).
+
+**4. Check the row level security policies.** Ask what changes for each kind of
+user, in both applications. Policies are the real authorization boundary;
+frontend guards are not.
+
+**5. Check whether business logic already lives in the database.** If a rule is
+enforced by a constraint, function or trigger, do not reimplement it in a client.
+
+**6. Consider both mobile interfaces.** `Mobile` has separate
+administrative and packer interfaces for different form factors. A shared
+component change affects both.
+
+**7. Consider the client portal.** `website` serves external client views
+from the same deployment and the same policy set. Widening a policy can widen
+client-visible data.
+
+**8. Check both migration directories.** Schema history is split across the two
+application repositories; neither is complete on its own.
+
+**9. Make the smallest practical change**, then validate. For `website`:
+typecheck, build, test, lint. For `Mobile`, verify on a device — there
+are no equivalent scripts.
+
+**10. State the cross-application impact in your pull request.** Explicitly:
+which screens and workflows are affected in each application, and what database
+impact the change has. If the answer is "none", say why you are confident.
+
+## Escalate rather than guess
+
+Stop and ask, or record an [open question](/docs/reference/open-questions), when:
+
+- the change depends on which role can do something — the live role set is
+  contradicted across sources
+  ([OQ-002](/docs/reference/open-questions#oq-002))
+- you cannot tell whether a mobile administrative screen is current or legacy
+- documentation and code disagree about a table's name or existence
+  ([OQ-007](/docs/reference/open-questions#oq-007))
+- the change would need a service-role key anywhere near a client
+
+## The underlying principles
+
+From the existing architecture document, and still the right instincts:
+
+1. Verify current code and the database before trusting older documentation.
+2. Treat Supabase as shared infrastructure.
+3. Check both applications before changing shared tables, RPCs, policies, auth,
+   or storage.
+4. Keep package definitions, overviews, instances and packed items distinct.
+5. Treat role names as technical details, not business truth.
+6. Expect database triggers to change state indirectly.
+7. Prefer small, focused changes with validation.

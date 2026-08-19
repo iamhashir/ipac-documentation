@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Docusaurus build output and caches
+.docusaurus/
+build/
+.cache-loader/
+
+# Vercel
+.vercel/
+
+# Environment files — this repository needs none. Never commit one.
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+*.swp
+
+# Logs
+npm-debug.log*
+yarn-error.log*

@@ -1,0 +1,129 @@
+---
+title: Mobile setup
+sidebar_label: Mobile setup
+description: Building and running the IPAC Mobile application, including the native development build that Expo Go cannot replace.
+---
+
+# Mobile setup
+
+`Mobile` needs a **native development build**. This is the
+single most important thing to know before starting: `expo-dev-client` is a
+dependency, so Expo Go will not run this project. Budget time for the first
+native build — it compiles native code and takes several minutes.
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'Mobile:package.json',
+    'Mobile:app.json',
+    'Mobile:eas.json',
+    'Mobile:.env.example',
+    'Mobile:README.md',
+  ]}>
+  Commands, scripts and build profiles were read from the repository. The
+  Android instructions are reproduced from its README and were **not executed**
+  while writing this page. iOS was not exercised at all. The repository URL is
+  omitted deliberately — see
+  [OQ-001](/docs/reference/open-questions#oq-001).
+</Status>
+
+## Clone and install
+
+```bash
+git clone https://github.com/ipacapps/Mobile.git
+cd Mobile
+
+nvm use            # .nvmrc pins 22.19.0
+npm install
+
+cp .env.example .env
+```
+
+Note that the directory is `Mobile`. Documents inside `website` still name this
+application `ipac_mobile`, and its own README still uses `ipac-operations-app` —
+both previously referenced names, neither of which exists as a directory. See
+[OQ-003](/docs/reference/open-questions#oq-003).
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | Start the Expo development server (Metro) |
+| `npm run android` | `expo run:android` — build and launch the native dev client |
+| `npm run ios` | `expo run:ios` |
+| `npm run web` | `expo start --web` |
+
+The repository defines **no** lint, typecheck or test script, even though
+TypeScript is a dev dependency. That asymmetry with `website` is worth
+knowing before you assume a safety net exists.
+
+## Running on a physical Android device over USB
+
+Reproduced from the repository README:
+
+1. Enable Developer Options and USB debugging on the device, connect it by USB,
+   and accept the debugging prompt.
+2. Confirm the device is detected and authorised:
+
+   ```bash
+   adb devices
+   # must list the device as "device", not "unauthorized"
+   ```
+
+3. On Windows, if `java` is not on your `PATH`, point `JAVA_HOME` at the JDK
+   bundled with Android Studio:
+
+   ```bash
+   export JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+   export PATH="$JAVA_HOME/bin:$PATH"
+   ```
+
+4. Build, install and launch:
+
+   ```bash
+   npx expo run:android
+   ```
+
+   The first build compiles native code and can take several minutes.
+   Subsequent runs reuse the Gradle and CMake caches.
+
+5. If the app opens on the dev-client home screen instead of connecting
+   automatically, tap the `http://localhost:8081` entry to load the JS bundle.
+   Metro is reached over the `adb reverse` tunnel.
+
+## Running on web
+
+```bash
+npx expo start --web
+```
+
+Useful for quick inspection. It is not a substitute for device testing: the two
+interfaces in this application are designed for different form factors, and
+layout behaviour differs.
+
+## EAS build profiles
+
+Three profiles are defined, all producing Android APKs with internal
+distribution:
+
+| Profile | Development client | Purpose |
+| --- | --- | --- |
+| `development` | Yes | The native dev build used for local development |
+| `preview` | No | Internal distribution for testing |
+| `production` | No | Release build |
+
+App version numbering is configured to come from EAS rather than the repository
+(`appVersionSource: remote`), so bumping a version locally is not what changes a
+build's version.
+
+## A configuration hazard
+
+`app.json` currently commits a Supabase URL and a publishable key into source
+control under `extra`, while `.env.example` describes `EXPO_PUBLIC_` variables
+for the same purpose. Two mechanisms supply the same configuration, and one of
+them is versioned.
+
+This documentation does not reproduce those values, and neither should any page,
+ticket, log, or assistant prompt. See
+[Environment variables](./environment-variables) for the rules.

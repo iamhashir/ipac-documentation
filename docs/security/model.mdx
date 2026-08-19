@@ -1,0 +1,199 @@
+---
+title: Security model
+sidebar_label: Model
+description: How authorization is supposed to work in IPAC — the four enforcement layers, what each one actually decides, and which is the real boundary.
+---
+
+# Security model
+
+This page describes how authorization is **designed** to work. For where it does
+not, see [Findings](./findings).
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:src/lib/access.ts',
+    'website:src/hooks/usePageAccess.ts',
+    'website:src/lib/supabase.ts',
+    'Mobile:app/index.tsx',
+    'Mobile:utils/AuthContext.tsx',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+  ]}>
+  All four enforcement layers were read directly in source. **RLS — the layer
+  that actually protects data — could not be verified**: policies exist in source
+  for only two of 63+ tables. Treat the RLS section as a description of the
+  intended design, not of the live configuration.
+</Status>
+
+## Authentication
+
+Both applications use Supabase Auth with email/password. There is no SSO, no
+magic link in use, and no MFA.
+
+```text
+User enters username OR email + password
+  ├─ contains "@"  → supabase.auth.signInWithPassword(email, password)
+  └─ no "@"        → RPC get_user_email_by_username(lookup_username) → email
+                     → supabase.auth.signInWithPassword(email, password)
+```
+
+Session handling differs deliberately between the applications:
+
+| | `website` | `Mobile` |
+| --- | --- | --- |
+| Storage | `localStorage` | `AsyncStorage` (native) |
+| Storage key | `ipac-admin-auth` | `ipac-operations-auth-v2` |
+| Flow | PKCE | default |
+| Session detection in URL | enabled | disabled |
+| Corrupt-session handling | cleared on module load | invalid refresh token triggers sign-out |
+
+Distinct storage keys mean the two applications' sessions never collide, even on
+the same device in a browser.
+
+## From session to access
+
+```text
+Session
+  └─ profiles row loaded, joined to roles(name)
+      └─ role = profile.roles?.name
+          └─ Layer 1: client-side route decision (both apps)
+          └─ Layer 2: Edge Function role check (privileged writes)
+          └─ Layer 3: SECURITY DEFINER function checks (capability gates)
+          └─ Layer 4: RLS (the real data boundary)
+```
+
+Until the profile has loaded, **neither application knows the role**. Both handle
+this by waiting rather than assuming — Mobile shows a loading state and a
+watchdog after 8 seconds; website's guard returns early while `profile` is null
+so it cannot redirect wrongly on first paint.
+
+## Layer 1 — Client-side routing
+
+**Decides:** which screens a signed-in user is shown.
+**Does not decide:** what data they can read.
+
+`website` centralises this in <SourceRef repo="website" path="src/lib/access.ts" />,
+consumed by the sidebar, the route guard and the post-login landing decision.
+`Mobile` implements it inline in three places: the entry route and the two group
+layouts.
+
+This layer is **advisory**. `website`'s guard is a `useEffect` redirect, so the
+protected component mounts and renders before the redirect fires. There is no
+server-side route authorization anywhere in either application.
+
+## Layer 2 — Edge Function
+
+**Decides:** whether a privileged write is permitted.
+
+One Edge Function exists:
+<SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" />. It is
+the only place in the system that legitimately holds a service-role key. Its
+sequence:
+
+1. Require an `Authorization: Bearer` token, and resolve it to a user.
+2. Load that user's profile with its role.
+3. Permit only roles `director` or `admin`.
+4. Create the auth user with `email_confirm: true`.
+5. Insert the `profiles` row, setting `status: 'active'` and
+   `packer_status: 'available'` for packers.
+6. Write an `audit_log` entry.
+7. If the profile insert fails, **delete the auth user** to avoid an orphan.
+
+The rollback in step 7 and the audit write in step 6 are good practice and worth
+preserving in any replacement.
+
+## Layer 3 — Database functions
+
+**Decides:** capability, independent of which client is calling.
+
+Only three functions are provably `SECURITY DEFINER`, all from the single
+migration, all granted to `authenticated`:
+
+| Function | Grants when |
+| --- | --- |
+| `is_team_lead_for_order(user_id, order_uuid)` | the user has `is_team_lead = TRUE` on that order |
+| `assign_team_lead(order_uuid, packer_uuid)` | (mutating — clears other leads, sets the new one) |
+| `can_user_mark_attendance(order_uuid)` | role is `admin` or `director` **and** `profiles.status = 'active'`, **or** caller is team lead for that order |
+
+This layer is the most trustworthy authorization in the system, because it runs
+in the database and cannot be bypassed by a client. It is also the smallest.
+
+`get_user_email_by_username` is called pre-authentication and is described in
+source as running with elevated privileges — so it is almost certainly a fourth
+`SECURITY DEFINER` function, but its definition is in no repository.
+
+## Layer 4 — Row Level Security
+
+**Decides:** everything that matters.
+
+Because Layer 1 is advisory and Layers 2–3 cover a handful of operations, RLS is
+the actual security boundary for the great majority of the 63+ tables.
+
+### What source proves
+
+Exactly two tables have policies written down, both in the single migration:
+
+**`attendance_logs`** — one `FOR ALL` policy for admin/director (with
+`profiles.status = 'active'`) or the order's team lead; one `FOR SELECT` policy
+letting packers read `packer_id = auth.uid()`.
+
+**`packer_sessions`** — the same shape, except its manage policy additionally
+requires the order to be in an active state, expressed as
+`orders.status IN ('pending','in_progress')` — a column that does not exist.
+
+### What requires live verification
+
+Everything else:
+
+- policies on the other ~61 tables
+- whether RLS is enabled on all of them
+- whether `client`-role users are correctly scoped to their own `client_id`
+- storage bucket policies for `media`, `order_media` and `signatures`
+- function `GRANT`s, in particular whether `get_user_email_by_username` is
+  callable by `anon`
+
+**Do not assume a table is protected because it is not mentioned here.** Assume
+nothing; query the database. Tracked as
+[OQ-008](/docs/reference/open-questions#oq-008) and
+[OQ-014](/docs/reference/open-questions#oq-014).
+
+## The permission-flag system is inert
+
+`roles` carries six booleans — `can_manage_roles`, `can_ban_users`,
+`can_block_users`, `can_delete_profiles`, `can_reset_passwords`,
+`can_unblock_users` — and a `user_effective_permissions` view plus
+`user_has_permission` and `get_user_role` functions exist.
+
+**No authorization decision in either application reads any of them.** Every
+real check compares role *names*. The `create-user` Edge Function even selects
+`can_manage_roles` and then ignores it in favour of a hardcoded name comparison.
+
+The intended design is therefore unclear: either the flags are a half-built
+system, or they are enforced somewhere only RLS can show us. Do not build on them
+until that is established —
+[OQ-016](/docs/reference/open-questions#oq-016).
+
+## Temporary privileges
+
+A `temporary_privileges` table exists (`user_id`, `granted_role_id`,
+`granted_by`, `expires_at`, `is_active`, `reason`) alongside a
+`deactivate_expired_privileges` function that **no application calls**. Time-boxed
+role elevation is therefore part of the design, is presumably operationally live,
+and is entirely undocumented. Its mechanism is
+[OQ-013](/docs/reference/open-questions#oq-013).
+
+## Assumptions this model makes about clients
+
+Stated explicitly, because each is a place where a determined user can act:
+
+1. **The client will honour a redirect.** It renders first, redirects after.
+2. **The client will send the role it was given.** Nothing signs the role; the
+   client reads it from `profiles` and acts on it.
+3. **Only the intended client calls the API.** Both applications ship a
+   publishable anon key; anyone holding it can call the REST API directly with
+   their own session.
+
+All three are acceptable **only if** RLS is complete and correct. That is why
+verifying RLS is the highest-priority open item in this documentation.

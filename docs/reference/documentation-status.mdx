@@ -1,0 +1,163 @@
+---
+title: Documentation status
+sidebar_label: Documentation status
+description: The status convention used on every page, and the rule that contradictions are recorded rather than resolved by guessing.
+---
+
+# Documentation status
+
+Existing IPAC material contains contradictions: sources disagree about role
+names, refer to directories that no longer exist, and describe features as
+unbuilt that have since shipped. Documentation that silently picks a winner in
+those disputes is worse than documentation that admits the dispute, because a
+confident wrong answer gets implemented.
+
+So every page on this site declares how far it can be trusted.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['ipac-documentation:src/components/Status/index.tsx']}>
+  This page documents a convention implemented in this repository, so it is
+  self-verifying.
+</Status>
+
+## The three states
+
+### Verified
+
+Every claim on the page was checked against the listed sources on the stated
+date. Sources are concrete: a file in a repository, a configuration value, a
+database object.
+
+```mdx
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['website:package.json', 'website:src/routes/']}>
+  Route inventory and dependency versions checked directly.
+</Status>
+```
+
+### Partially Verified
+
+Some claims were checked and others were inherited from earlier material
+without independent confirmation. **The body must say which is which.** This is
+the correct status for anything restated from a previous document rather than
+observed first-hand.
+
+```mdx
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={['website:docs/ARCHITECTURE.md']}>
+  Repository facts were checked directly. Live database counts are inherited
+  from `website/docs/ARCHITECTURE.md`, which recorded them on 2026-08-08;
+  they were not re-queried in this pass.
+</Status>
+```
+
+### Open Question
+
+A real contradiction, gap, or unconfirmed assumption. Use this instead of
+choosing a plausible value.
+
+```mdx
+<Status type="open-question" date="2026-08-19">
+  Sources disagree on the live role set. Recorded in
+  [Open questions](/docs/reference/open-questions); not resolved here.
+</Status>
+```
+
+## When you must use Open Question
+
+Use it — rather than your best guess — for:
+
+- **Unresolved roles.** Role names that appear in code but not in the live
+  database, or hierarchies that different sources describe differently.
+- **Uncertain repository ownership.** Which remote is canonical, who has
+  administrative rights.
+- **Unclear business rules.** Behaviour that the code performs but whose
+  intent nobody has confirmed.
+- **Undocumented architecture.** Structure that exists but whose purpose or
+  current usage is unknown.
+
+Every Open Question on a page must also appear on the
+[Open questions](/docs/reference/open-questions) register, so the backlog is
+visible in one place instead of scattered through prose.
+
+## Referring to source code
+
+Documentation links to code; it does not copy it. Copied schema, policy text
+and function bodies rot within weeks and then actively mislead.
+
+References use a component that resolves a repository key and a path against a
+registry in `docusaurus.config.ts`:
+
+```mdx
+<SourceRef repo="website" path="src/lib/supabase.ts" />
+<SourceRef repo="website" path="src/lib/access.ts" symbol="route access policy" />
+<SourceRef repo="Mobile" path="utils/AuthContext.tsx" />
+```
+
+Rendered:
+
+- <SourceRef repo="website" path="src/lib/supabase.ts" />
+- <SourceRef repo="Mobile" path="utils/AuthContext.tsx" />
+
+Two deliberate properties of this design:
+
+- **Commit-SHA pinning is not automated yet**, but nothing in the pages
+  prevents it. The registry holds one `ref` per repository; replacing a branch
+  name with a commit SHA there upgrades every reference on the site at once,
+  with no page edits.
+- **A repository with no confirmed URL renders as plain text**, marked as
+  unconfirmed, rather than linking to an invented address. Both application
+  repositories are now confirmed under the `ipacapps` organisation, so both
+  references above resolve to links — but the mechanism remains, and is the correct
+  behaviour for any repository added before its location is established.
+
+Prefer a symbol name to a line range. Line numbers move; names usually survive.
+
+## What must never appear on this site
+
+Regardless of status, never document:
+
+- passwords, tokens, API keys, or service-role keys
+- private credentials of any kind
+- real secret values, even expired ones
+- user personal data or private table rows
+
+Environment variables are documented by **name only**. See
+[Environment variables](/docs/guides/getting-started/environment-variables).
+
+## What "requires live verification" means here
+
+Backend topics carry a fourth, stronger caveat. IPAC's database is **not
+reproducible from its repositories**: one migration file covers 63+ tables, and
+`website` has no migrations directory at all. Anything concerning triggers, RLS
+beyond two tables, storage bucket configuration, grants, or current object counts
+cannot be established from source at any confidence level.
+
+Those claims are labelled **requires live database verification** and must not be
+acted on until someone has queried the live project. The reasoning is set out in
+[Schema provenance](/docs/backend/schema-provenance), and the queue of outstanding
+checks is in [Open questions](/docs/reference/open-questions).
+
+## Sections that exist, and why others do not
+
+| Section | State |
+| --- | --- |
+| Guides, Architecture, Cross-app | Written from source |
+| Backend — database model, schema provenance | Written from source, with live-verification caveats |
+| Security — model, findings | Written from source; RLS layer unverifiable |
+| Workflows W1–W6 | Written from source; cross-application only |
+| Mobile — build & release | Written from source; distribution process is an open question |
+| website — roles & permissions | Written from source; documents a divergence, not a resolution |
+| Backend — RLS, storage | **Not created.** Cannot be written honestly without live access |
+| Per-feature documentation | **Not created.** Needs product input |
+| Troubleshooting | Written from incident logs, fix commits and configuration |
+| ADRs | Three records written from repository evidence; one is `Historical / Current state unresolved` |
+
+Empty pages are not created. A missing section is a deliberate statement that the
+evidence is not yet good enough.

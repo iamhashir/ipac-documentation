@@ -1,0 +1,124 @@
+---
+title: Architectural decisions
+sidebar_label: Overview
+description: Why IPAC keeps ADRs, when one is required, and the lifecycle states used — including Historical and Unresolved for decisions the evidence cannot fully settle.
+---
+
+# Architectural decisions
+
+An **ADR** — Architecture Decision Record — is a short document recording a
+decision that shaped the system: what was decided, why, and what it cost.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['ipac-documentation:docs/adr/']}>
+  This page documents a convention adopted in this repository, so it is
+  self-verifying. The individual ADRs each carry their own evidence confidence.
+</Status>
+
+## Why IPAC keeps them
+
+IPAC's knowledge concentrated in very few people: one application is 91% the work
+of a single author, the other 70%. Code shows *what* the system does. It almost never
+shows **why a choice was made, or what was rejected** — and that is exactly what a
+new developer needs in order to change something safely rather than reverse a
+deliberate decision by accident.
+
+Three decisions in this system are already at risk of being lost, and they are the
+three recorded here.
+
+:::danger An ADR is not permission to reconstruct history
+
+These ADRs were written **after the fact**, from repository evidence. No formal ADR
+process existed at the time any of these decisions were made.
+
+The rule that follows from that:
+
+- If the repository proves **what changed, when, and why** → record all three.
+- If it proves only **what changed** → record only that, and write
+  **"Not recorded"** for the rest.
+
+Never infer a motive from an outcome. A plausible rationale presented as fact is
+worse than an admitted gap, because the next developer cannot tell the difference.
+
+:::
+
+## The records
+
+| ADR | Subject | Status | Evidence confidence |
+| --- | --- | --- | --- |
+| [ADR-0001](./adr-0001-website-framework) | Web application framework: Expo Web → TanStack Start | Accepted | High — motivation stated in the repository |
+| [ADR-0002](./adr-0002-repository-migration) | Repository and organisation migration | Accepted | High for *what*, none for *why* |
+| [ADR-0003](./adr-0003-report-packed-date) | Report packed-date semantics | **Historical / Current state unresolved** | High historically, unverified currently |
+
+## Lifecycle states
+
+IPAC uses six. The last two exist because retrofitted records cannot always claim
+more.
+
+| Status | Meaning |
+| --- | --- |
+| **Proposed** | Written and under discussion. Not in effect. |
+| **Accepted** | Decided and in effect. The current intended design. |
+| **Superseded** | Replaced by a later ADR, which must be named. Kept, never deleted. |
+| **Deprecated** | No longer intended, with no direct replacement. |
+| **Historical** | Records something that demonstrably happened, reconstructed after the fact. It documents the past; it does not assert the present. |
+| **Unresolved** | The decision was made and applied, but **the current state cannot be verified**. Must link the open question that would settle it. |
+
+`Historical / Current state unresolved` is a legitimate combination, and
+[ADR-0003](./adr-0003-report-packed-date) uses it: what was done is provable, what is
+live today is not.
+
+## When a new ADR is required
+
+Write one when the change affects:
+
+- **application architecture** — framework, rendering model, routing strategy
+- **shared backend contracts** — a table, RPC signature or enum that both
+  applications depend on
+- **the authentication or authorization model** — including anything touching the
+  four enforcement layers
+- **RLS strategy** — how policies are structured, not an individual policy
+- **major framework changes** — a dependency the architecture rests on
+- **deployment architecture** — hosting, pipeline, or release mechanism
+- **cross-application data contracts** — anything in the 26 shared tables
+- **migration strategy** — schema versioning, repository moves, data backfills
+
+The test: *would a competent developer six months from now reverse this by accident
+because the reason is invisible?* If yes, write the ADR.
+
+## When an ADR is not required
+
+Do not write one for routine implementation decisions:
+
+- choosing a component structure inside one feature
+- naming, formatting, refactoring
+- adding a field to an existing screen
+- fixing a bug without changing a contract
+- dependency patch and minor upgrades
+
+For those, the code, the commit message and — where relevant — a `Trail/` entry in
+the application repository are enough. See
+[step 11 of Your first change](/docs/guides/getting-started/first-change#step-11) for
+the documentation rule that governs the everyday case.
+
+## Writing one
+
+Copy the section structure from any existing ADR. Every one carries a header block:
+
+```text
+Status:              one of the six above
+Date:                when the decision took effect, or "Not recorded"
+Decision owners:     who decided, or "Not recorded"
+Evidence confidence: what the repository actually proves
+```
+
+Then: Context · Problem · Decision · Alternatives · Consequences (positive,
+negative, risks) · Current State · Evidence · Related Documentation · Open
+Questions.
+
+**Alternatives is the section most often faked.** If no alternative was evaluated at
+the time — or if the evaluation was not written down — the honest entry is
+**"Not recorded."** Listing alternatives you thought of while writing the ADR
+misrepresents the decision as more considered than it was.

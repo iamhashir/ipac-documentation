@@ -1,0 +1,128 @@
+---
+title: Schema provenance
+sidebar_label: Schema provenance
+description: Where IPAC's schema knowledge comes from, why the generated types are stale, and why the database cannot currently be rebuilt from the repositories.
+---
+
+# Schema provenance
+
+**Read this before trusting any schema fact on this site.**
+
+IPAC's database is not defined by its repositories. It is defined by the live
+Supabase project, and the repositories contain only partial, dated echoes of it.
+This page states exactly what those echoes are and how far each can be trusted.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:src/types/supabase.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'website:Trail/packed-date-report-conflict-log.md',
+  ]}>
+  Every claim on this page is about the contents of the repositories, which were
+  read directly. It makes no claim about the current state of the database.
+</Status>
+
+## The three sources, ranked
+
+### 1. Generated types — broad but stale
+
+<SourceRef repo="website" path="src/types/supabase.ts" /> is a generated
+Supabase types file of 4,218 lines. It is the single most informative schema
+artifact in either repository, declaring **63 tables, 3 views, 49 functions,
+8 enums and 188 foreign keys** with exact column types and nullability.
+
+**It is provably out of date.** Application code references database objects
+that the file does not declare:
+
+| Missing from the types file | Used by |
+| --- | --- |
+| `order_item_allocation`, `destinations`, `allocation_increase_requests`, `signatures` | `website` |
+| `order_media` | `Mobile` |
+| `add_order_item_allocation`, `apply_order_item_allocations`, `upsert_order_item_allocation`, `set_allocation_expected`, `approve_allocation_increase_request`, `reject_allocation_increase_request`, `fetch_report_instances`, `fetch_instance_items` | `website` |
+
+The entire allocation subsystem post-dates the snapshot. So does the reporting
+RPC that `website` depends on. The file carries no generation date, and nothing
+in either repository records when it was produced or by whom.
+
+**How to treat it:** as a lower bound on what exists, never as a description of
+what exists now. A table in the file almost certainly exists; a table absent
+from the file may well exist too.
+
+### 2. The one migration — narrow but exact
+
+<SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" />
+is the **only** migration file in either repository. It is exact and complete
+for what it touches: one column, one index, three `SECURITY DEFINER` functions
+with their bodies and grants, and explicit RLS policies for two tables.
+
+It is also the only place in any repository where an RLS policy is written down.
+
+### 3. Trail logs — narrative, and the only record of some changes
+
+`website/Trail/` and `Mobile/Trail/` are incident logs. They are prose, not
+schema, but they record database changes that exist nowhere else — including a
+named migration applied to production and later reverted.
+
+## The database is not reproducible from the repositories
+
+This is the central fact, and it is not a suspicion — it is documented.
+
+<Status type="verified" date="2026-08-19"
+  sources={['website:Trail/packed-date-report-conflict-log.md']}>
+  A migration named `prefer_instance_packed_at_in_reports` was applied to the
+  live project, replacing the body of the `fetch_report_instances` RPC, and was
+  later reverted. **Neither the migration nor its revert exists in any
+  repository.** The log is the only record — see
+  [ADR-0003](/docs/adr/adr-0003-report-packed-date).
+</Status>
+
+Consequences, stated plainly:
+
+- **There is no reviewable history.** 63+ tables and 49+ functions have one
+  migration between them. You cannot diff a schema change, and you cannot see
+  who changed what when.
+- **There is no revert path.** Reverting the change above meant manually
+  reapplying the previous function body from memory or from the log.
+- **A fresh environment cannot be created.** There is no sequence of files that
+  produces this database, so there is no staging environment that provably
+  matches production, and no local database at all.
+- **`website` has no `supabase/` directory whatsoever.** Every schema change
+  made for the web application is unversioned.
+
+A second instance of the same pattern: a migration file named
+`add_packing_start_completion_date_modes` exists as an **uncommitted** file in
+an older local checkout. It was never committed to any repository.
+
+## What this means for reading these docs
+
+Pages on this site use three status labels, and on backend topics they mean
+something specific:
+
+| Label | On a backend page it means |
+| --- | --- |
+| **Verified** | Read directly from a repository file — the types snapshot, the migration, or application code. The claim is about what the source says. |
+| **Partially Verified** | Part of the claim comes from source; part is inherited from prose that was not re-checked. |
+| **Requires live database verification** | Source cannot answer this. Do not act on an assumption here. |
+
+Anything about **triggers, RLS on the other ~61 tables, storage bucket
+configuration, grants, or current object counts** falls into the third category.
+No repository contains that information.
+
+## Restoring reproducibility
+
+Not a documentation task, but the documentation cannot become trustworthy
+without it. The minimum viable change:
+
+1. **Adopt a migrations directory for `website`.** It has none.
+2. **Author changes as migration files first**, then apply them — rather than
+   applying them to the live project and naming them afterwards.
+3. **Baseline the current schema** by dumping it into a first migration, so
+   subsequent diffs mean something.
+4. **Regenerate the types file as part of that baseline**, and record the date.
+
+Until at least steps 1 and 4 happen, every backend page here has a shelf life
+measured in weeks. Tracked as
+[OQ-011](/docs/reference/open-questions#oq-011) and
+[OQ-008](/docs/reference/open-questions#oq-008).

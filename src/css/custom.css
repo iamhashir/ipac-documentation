@@ -1,0 +1,106 @@
+/**
+ * IPAC documentation theme.
+ *
+ * An industrial, high-contrast palette chosen to be legible on site and in
+ * dark rooms. Intentionally distinct from any upstream documentation site's
+ * branding — the information architecture is borrowed, the identity is not.
+ */
+
+:root {
+  --ifm-color-primary: #16607a;
+  --ifm-color-primary-dark: #14566e;
+  --ifm-color-primary-darker: #135268;
+  --ifm-color-primary-darkest: #0f4355;
+  --ifm-color-primary-light: #186b88;
+  --ifm-color-primary-lighter: #196f8d;
+  --ifm-color-primary-lightest: #2392b9;
+
+  --ipac-accent: #b45309;
+  --ipac-accent-soft: rgba(180, 83, 9, 0.1);
+
+  --ipac-surface: #ffffff;
+  --ipac-surface-raised: #f7f9fa;
+  --ipac-border: #dfe5e8;
+  --ipac-muted: #5b6a70;
+
+  --ifm-font-family-base:
+    system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --ifm-code-font-size: 92%;
+  --ifm-heading-font-weight: 650;
+  --ifm-navbar-shadow: inset 0 -1px 0 var(--ipac-border);
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme='dark'] {
+  --ifm-color-primary: #47a8c9;
+  --ifm-color-primary-dark: #2f9bbf;
+  --ifm-color-primary-darker: #2c93b5;
+  --ifm-color-primary-darkest: #247995;
+  --ifm-color-primary-light: #61b5d1;
+  --ifm-color-primary-lighter: #6ebbd5;
+  --ifm-color-primary-lightest: #94cee2;
+
+  --ipac-accent: #f0a94c;
+  --ipac-accent-soft: rgba(240, 169, 76, 0.14);
+
+  --ipac-surface: #16191d;
+  --ipac-surface-raised: #1d2126;
+  --ipac-border: #2d333a;
+  --ipac-muted: #9aa7ae;
+
+  --ifm-background-color: #14171a;
+  --ifm-background-surface-color: #1a1e22;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* Readability: docs prose is the product here. */
+.markdown h1 {
+  font-size: 2.15rem;
+  letter-spacing: -0.02em;
+}
+
+.markdown > h2 {
+  margin-top: 2.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--ipac-border);
+}
+
+/* Docusaurus makes tables `display: block; overflow: auto` so they scroll on
+   narrow screens. Keep that — overriding it to `display: table` makes wide tables
+   push the whole page sideways on mobile. Full width is applied only where the
+   viewport can afford it. */
+.markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (min-width: 997px) {
+  .markdown table {
+    width: 100%;
+  }
+}
+
+/* Wide content must scroll inside itself, never scroll the page sideways. */
+.markdown .table-wrapper,
+.markdown pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Mermaid diagrams: centre them and let them scroll on narrow screens. */
+.docusaurus-mermaid-container {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.navbar-github-link:hover {
+  opacity: 0.75;
+}
+
+/* Short link labels in tables (e.g. open-question IDs) should not wrap
+   mid-token in a narrow column. */
+.markdown table td a {
+  white-space: nowrap;
+}

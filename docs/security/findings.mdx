@@ -1,0 +1,246 @@
+---
+title: Security findings
+sidebar_label: Findings
+description: The open security findings from the 2026-08-19 source audit of Mobile and website, classified by severity, with evidence and remediation.
+---
+
+# Security findings
+
+Findings from a **source-only** audit on 2026-08-19. No penetration testing, no
+live database inspection, no runtime analysis. Several findings therefore state a
+verified *pattern* whose real-world impact depends on RLS or storage
+configuration that only a live check can confirm.
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:src/routes/',
+    'website:src/middleware/auth.ts',
+    'website:inspect_rpc.js',
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:app.json',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:Trail/login-hashir-1.md',
+    'website:Trail/packed-date-report-conflict-log.md',
+  ]}>
+  Every finding cites a file that was read directly. Where impact depends on the
+  live database, that is stated in the finding rather than assumed either way.
+  **No secret values appear on this page or anywhere on this site.**
+</Status>
+
+:::info No CRITICAL findings — with one caveat
+
+Nothing in source rises to CRITICAL on its own. Two HIGH findings (H2, H3) would
+become CRITICAL if live verification goes the wrong way. They are the two things
+to check first.
+
+:::
+
+## HIGH
+
+### H1 — `/inventory` has no route guard {#h1}
+
+| | |
+| --- | --- |
+| Repository | `website` |
+| File | <SourceRef repo="website" path="src/routes/inventory.tsx" /> |
+| Evidence | The route is listed in `ADMIN_PAGES` in `src/lib/access.ts` but does not call `useRequirePageAccess`. All 13 sibling protected pages do. |
+| Confidence | **VERIFIED** as a gap. Data exposure: **REQUIRES LIVE DATABASE VERIFICATION** |
+
+A signed-in `client`- or `packer`-role user navigating directly to `/inventory`
+renders the full 2,765-line inventory module, including supplier and pricing
+views. What they can actually *see* is decided by RLS on `materials`,
+`material_variants`, `suppliers` and `supplier_pricing` — which is unverified.
+
+**Fix:** add `useRequirePageAccess()` to the route. One line, and it makes the
+page consistent with every sibling. It does not remove the need for RLS.
+
+### H2 — Mobile package photos are uploaded to a bucket with public URLs {#h2}
+
+| | |
+| --- | --- |
+| Repository | `Mobile` |
+| File | <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="order media upload" /> |
+| Evidence | `storage.from('order_media').upload(...)` immediately followed by `storage.from('order_media').getPublicUrl(filename)`. Filenames are `orderPackageId/timestamp.ext`. |
+| Confidence | **VERIFIED** as a pattern. Bucket visibility: **REQUIRES LIVE DATABASE VERIFICATION** |
+
+`getPublicUrl` only returns a working URL for a public bucket. If `order_media`
+is public, client cargo photographs are readable by anyone with the URL, and the
+URL is guessable in structure. `website` uses a different bucket (`media`)
+entirely, and only `media` appears in the schema snapshot.
+
+**Check first:** does `order_media` exist, and is it public? If public and
+containing client imagery, this becomes CRITICAL. Use signed URLs instead.
+Tracked as [OQ-015](/docs/reference/open-questions#oq-015).
+
+### H3 — A written RLS policy is predicated on a non-existent column {#h3}
+
+| | |
+| --- | --- |
+| Repository | `Mobile` |
+| File | <SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" /> |
+| Evidence | The `packer_sessions` manage policy requires `orders.status IN ('pending','in_progress')`. `orders` has `production_status` and `commercial_status`, no `status`. No application code reads `orders.status`. |
+| Confidence | **VERIFIED** as an inconsistency. Live state: **REQUIRES LIVE DATABASE VERIFICATION** |
+
+The migration drops three pre-existing policies before creating the new ones. If
+the `CREATE` failed, `packer_sessions` is left with RLS enabled and **no manage
+policy**, which fails closed — annoying but safe. If it somehow succeeded against
+a column that has since been removed, the live policy differs from the file, and
+nobody knows what it says.
+
+**Check first:** dump the live policies on `packer_sessions`.
+[OQ-014](/docs/reference/open-questions#oq-014).
+
+### H4 — Authorization is duplicated across four layers with different role sets {#h4}
+
+| | |
+| --- | --- |
+| Repositories | both |
+| Evidence | `website` grants full access to admin/director/executive/sales; `Mobile` route guards allow admin/director/sales; `create-user` permits director/admin; `can_user_mark_attendance` permits admin/director. |
+| Confidence | **VERIFIED** |
+
+Four hardcoded lists, no shared definition, already divergent — an `executive`
+can use all of `website` and is bounced to the login screen by `Mobile`. Renaming
+or removing a role breaks four places with no compile-time error.
+
+**Fix:** one shared definition, and derive the rest. Documented in full at
+[Roles and permissions](/docs/website/roles-and-permissions).
+
+### H5 — Users have been provisioned by direct SQL, bypassing the Edge Function {#h5}
+
+| | |
+| --- | --- |
+| Repository | `Mobile` |
+| File | <SourceRef repo="Mobile" path="Trail/login-hashir-1.md" /> |
+| Evidence | An admin account was created *"directly in the Supabase DB rather than through Supabase's normal signup/admin API"*, causing sign-in to fail with `Database error querying schema`. |
+| Confidence | **VERIFIED** |
+
+Two problems. **Process:** bypassing `create-user` skips its `director`/`admin`
+role check and its `audit_log` write, so `audit_log` is **not** a complete record
+of user creation. **Reliability:** the same incident is the root cause of a
+confusing auth failure — see
+[Troubleshooting A1](/docs/troubleshooting/authentication#a1).
+
+**Fix:** provision users only through the Edge Function. If direct SQL is
+unavoidable, the `auth.identities` row and the empty-string columns are mandatory.
+
+### H6 — Database changes are applied to production without version control {#h6}
+
+| | |
+| --- | --- |
+| Repository | `website` |
+| File | <SourceRef repo="website" path="Trail/packed-date-report-conflict-log.md" /> |
+| Evidence | A migration named `prefer_instance_packed_at_in_reports` was applied to the live project, replacing the `fetch_report_instances` RPC body, then reverted. Neither exists in any repository. `website` has no `supabase/` directory at all. |
+| Confidence | **VERIFIED** |
+
+A security finding, not merely a hygiene one: there is no reviewable history of
+changes to policies, grants, functions or triggers. A privilege change could be
+made and nobody could later prove what changed or revert it reliably.
+
+**Fix:** see [Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+## MEDIUM
+
+### M1 — Username-to-email disclosure {#m1}
+
+`get_user_email_by_username` returns an email for a username and is called
+**before** authentication. Mobile's comment confirms it runs with elevated
+privileges. If it is granted to `anon`, it is an unauthenticated
+username-to-email enumeration oracle; if granted only to `authenticated`, the
+username login flow could not work pre-session — which suggests `anon` access.
+**Requires live verification of grants.** Mitigation: rate limiting, or accept
+the trade-off knowingly.
+
+### M2 — Backend config is committed and logged {#m2}
+
+`Mobile/app.json` commits `extra.supabaseUrl` and `extra.supabasePublishableKey`,
+and <SourceRef repo="Mobile" path="utils/api/supabase.ts" /> prints both to the
+console on every launch via four `console.warn` calls (the code comments them as
+*"test logs"* to remove). The key is the publishable/anon key — **public by
+design**, so this is not a secret leak. The finding is the pattern: it defeats
+rotation and environment separation, and would be severe if a secret key were
+ever placed in that slot.
+
+### M3 — Ad-hoc production query scripts committed at the repository root {#m3}
+
+`website` contains `inspect_schema.js`, `inspect_rpc.js`, `inspect_instances.js`
+and `inspect_clients.js`, each hardcoding the project URL and publishable key and
+querying the live database. `Trail/box-snapshots-2026-08-10.json` shows the same
+habit for data — a hand-rolled JSON backup taken before a production "redo".
+Unlabelled production tooling invites accidental use against live data.
+
+### M4 — Dead code that reads as a security control {#m4}
+
+<SourceRef repo="website" path="src/middleware/auth.ts" symbol="requireAdmin" />
+performs **no** role check and returns the user, with the comment *"This is a
+placeholder - implement actual role checking"*. Neither it nor `requireAuth` is
+imported anywhere. A future developer could reasonably believe calling
+`requireAdmin()` protects a route. Delete it or implement it.
+
+### M5 — Permissive CORS on the privileged Edge Function {#m5}
+
+`create-user` sets `Access-Control-Allow-Origin: '*'`. Mitigated by requiring a
+bearer token and checking the role, so this is not exploitable on its own, but a
+service-role endpoint should not accept requests from any origin.
+
+### M6 — Unused SMS-OTP authentication path {#m6}
+
+`signInWithPhone` and `verifyOtp` are implemented and exposed through
+`AuthContext`, but **no screen calls them**. If phone auth is enabled in the
+Supabase project, that is an unmonitored second entry point. Either remove the
+code or document and monitor it.
+[OQ-017](/docs/reference/open-questions#oq-017).
+
+### M7 — Service-role key resolved from multiple fallback names {#m7}
+
+`create-user` tries `SUPABASE_SERVICE_ROLE_KEY`, then `SERVICE_ROLE_KEY`, then
+`AUTH_SECRET_KEY`. The webhook tries `SUPABASE_SECRET_KEY` then
+`SUPABASE_SERVICE_ROLE_KEY`. Ambiguity about which name is authoritative invites
+misconfiguration, and makes it hard to prove a key has been fully rotated.
+
+### M8 — Null dereference on a privileged path {#m8}
+
+`create-user` reads `profile.roles.name` without a null check. A profile whose
+role join returns null produces an unhandled 500 rather than a clean 403.
+
+## LOW
+
+- **Verbose logging ships to production.** `Mobile` contains 120 `console.error`,
+  70 `console.log` and 21 `console.warn` calls, and `eas.json` applies no
+  stripping. Operational data may land in device logs.
+- **No error boundary** in either application. `Mobile` surfaces failures through
+  183 `Alert.alert` sites with inconsistent wording.
+- **`debug_user_info`** exists as a database function; `components/debug/NetworkTest.tsx`
+  reads environment variables directly.
+- **Tests do not gate deployment.** `website`'s production workflow runs tests
+  with `continue-on-error: true`, and only two test files exist. `Mobile` has no
+  tests and no test script.
+
+## What is good, and should not be lost
+
+Worth recording so a refactor does not remove it:
+
+- The Resend inbound webhook **verifies svix signatures** before trusting a
+  payload.
+- `create-user` **rolls back the auth user** if the profile insert fails, and
+  **writes to `audit_log`**.
+- The two applications use **distinct session storage keys**, so sessions cannot
+  collide.
+- `website` uses **PKCE** and clears corrupted sessions on load.
+- `audit_log` supports an **`is_critical_alert`** flag, so a severity concept
+  already exists.
+- <SourceRef repo="website" path="AGENTS.md" /> already contains a **Database
+  Safety** policy and a six-step **Database Change Process**. It is real
+  governance and should be adopted rather than rewritten.
+
+## Verification queue
+
+In priority order, because two HIGH findings hinge on them:
+
+1. Is bucket `order_media` present and public? (H2)
+2. What are the live policies on `packer_sessions`? (H3)
+3. What are the live `roles.name` values? (H4)
+4. Who may execute `get_user_email_by_username`? (M1)
+5. Is RLS enabled, with policies, on all tables — starting with the 26 shared ones?
+6. Is phone auth enabled in the project? (M6)

@@ -1,0 +1,56 @@
+---
+title: Getting started
+sidebar_label: Overview
+description: The reading order and setup path for a developer joining IPAC.
+---
+
+# Getting started
+
+This section takes a developer with no prior exposure to IPAC from an empty
+machine to a first reviewed change. Read it in order — each page assumes the
+previous one.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['website:docs/DEVELOPMENT.md', 'Mobile:README.md']}>
+  The setup path is derived from both repositories' own instructions and their
+  configuration files, corrected where those instructions no longer match what
+  is on disk. Corrections are noted where they occur.
+</Status>
+
+## The path
+
+1. **[Prerequisites](./prerequisites)** — what must be installed, and the
+   accounts you need before anything will run.
+2. **[Repositories](./repositories)** — what exists, where, and which
+   ownership questions are still unresolved.
+3. **[`website` setup](./website-setup)** — the fastest application to
+   get running. Start here.
+4. **[`Mobile` setup](./mobile-setup)** — requires a native
+   development build; budget more time.
+5. **[Environment variables](./environment-variables)** — which variables each
+   application needs, by name, and which must never reach a client.
+6. **[Your first change](./first-change)** — the sequence to follow so that a
+   change to one application does not break the other.
+
+## Before you start, understand this
+
+The two applications share **one** Supabase project. Authentication, the
+database, row level security, storage and database functions are common to both.
+Business logic lives in the database as well as in the applications, so a change
+that looks local can have effects you did not intend in the other application.
+
+Read [System architecture](/docs/guides/architecture/system-overview) alongside
+this section — ideally before you write anything.
+
+## Two things this documentation will not do
+
+- **It will not tell you a secret value.** Environment variables are documented
+  by name only. Credentials come from a person or a secret store, never from a
+  page.
+- **It will not guess.** Where existing sources contradict each other, you will
+  be sent to [Open questions](/docs/reference/open-questions) instead of being
+  given a confident answer. Several of those questions affect setup directly —
+  including which Node version is supported and which mobile repository is
+  canonical.

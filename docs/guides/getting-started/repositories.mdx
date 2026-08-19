@@ -1,0 +1,117 @@
+---
+title: Repositories
+sidebar_label: Repositories
+description: The repositories that make up IPAC, their stacks, and the unresolved question of mobile repository ownership.
+---
+
+# Repositories
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:.github/workflows/ci-cd.yml',
+    'Mobile:package.json',
+    'Mobile:app.json',
+    'Mobile:eas.json',
+  ]}>
+  Stacks, branches and pipelines were read directly from each repository.
+  The canonical organisation is **`ipacapps`**, confirmed 2026-08-19
+  ([OQ-010](/docs/reference/open-questions#oq-010) closed), and both application
+  repository URLs are now established
+  ([OQ-001](/docs/reference/open-questions#oq-001) closed).
+</Status>
+
+## Three repositories
+
+The canonical layout:
+
+```text
+ipacapps/
+├── ipac-documentation
+├── website
+└── Mobile
+```
+
+| Repository | Purpose | Location |
+| --- | --- | --- |
+| `website` | Web application for managers, administrators, and restricted client views | `github.com/ipacapps/website` |
+| `Mobile` | React Native / Expo application for field operations | `github.com/ipacapps/Mobile` |
+| `ipac-documentation` | This site | `github.com/ipacapps/ipac-documentation` (not yet created) |
+
+:::note Older names you will still encounter
+
+Both applications were previously referenced under different names, and those
+names remain in the application repositories' own documents, in git remotes, and
+in some build identifiers:
+
+| Current | Previously referenced as |
+| --- | --- |
+| `website` | `admin-panel`, under the `it-ipac` organisation |
+| `Mobile` | `ipac-operations-app`, and as `ipac_mobile` in `website/docs/` |
+
+The migration is recorded in [ADR-0002](/docs/adr/adr-0002-repository-migration).
+A merge commit in `website`'s own history records the move:
+`Merge branch 'main' of https://github.com/it-ipac/admin-panel`. Old GitHub URLs
+redirect, so a stale remote keeps working and gives no signal that it is stale.
+
+Use the current names. Treat the older ones as historical only — and see
+[OQ-003](/docs/reference/open-questions#oq-003), because some of them are still
+load-bearing in configuration.
+
+:::
+
+The documentation repository is deliberately **independent**. It contains no
+application code, has no build-time dependency on either application, and can
+be cloned, built and deployed on its own.
+
+## website
+
+- **Stack.** React 19, TypeScript, TanStack Start with TanStack Router and
+  TanStack Query, Vite 7, Nitro with the `vercel` preset, Supabase JS,
+  Tailwind CSS 4 with DaisyUI, Radix primitives, Zod, Vitest, Biome.
+- **Branches.** `main` is the production branch; `dev` also exists, along with
+  feature branches.
+- **Deployment.** Vercel, driven by **GitHub Actions** rather than Vercel's Git
+  integration: the workflow runs `vercel pull`, `vercel build --prod`, then
+  `vercel deploy --prebuilt --prod`. A separate workflow validates pull
+  requests.
+- **Scripts.** `dev`, `build`, `test`, `lint`, `typecheck`, and `validate`
+  (typecheck followed by build) — run `validate` before opening a pull request.
+
+## Mobile
+
+- **Stack.** React Native 0.81 with Expo 54, Expo Router 6, React 19,
+  NativeWind 4, Supabase JS, React context for state, AsyncStorage.
+- **Interfaces.** Route groups separate an administrative interface from a
+  packer interface, plus an authentication group.
+- **Builds.** EAS with three profiles — development, preview and production.
+  All three produce Android APKs; the development profile builds a development
+  client.
+- **Constraint.** `expo-dev-client` is a dependency, so a native development
+  build is required. Expo Go is not supported.
+
+## ipac-documentation
+
+- **Stack.** Docusaurus 3 with TypeScript and MDX, Mermaid for diagrams,
+  deployed on Vercel via native Git integration.
+- **Content boundary.** Canonical for architecture, onboarding, workflows,
+  security model, backend concepts, deployment, troubleshooting and
+  architectural decisions. Agent instructions, code conventions, development
+  notes and investigation logs stay in the application repositories.
+
+## What the application repositories still own
+
+Do not move these here, and do not duplicate them:
+
+- `CLAUDE.md`, `AGENTS.md` and Copilot instructions — assistant guidance that
+  must sit next to the code it governs.
+- Code-level conventions enforced during review, such as file size limits, layer
+  boundaries and naming rules.
+- `Trail/` directories — internal investigation logs and conflict records.
+- Temporary development notes.
+
+Note that `website/CLAUDE.md` refers to a `.docs/` reference set and a
+worklog protocol that do not exist in the repository. See
+[OQ-004](/docs/reference/open-questions#oq-004) before following it.

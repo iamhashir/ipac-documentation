@@ -1,0 +1,232 @@
+---
+title: Cross-application architecture
+sidebar_label: Cross-app architecture
+description: How Mobile and website interact through the shared Supabase project — 26 shared tables, one shared RPC, directional data flows, and the tables where a change breaks the other application.
+---
+
+# Cross-application architecture
+
+Two applications, one Supabase project, and **no interface between them**. They
+coordinate by writing and reading each other's rows. This page enumerates that
+coupling precisely, because it is the part of IPAC most likely to break.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:src/',
+    'website:server/',
+    'Mobile:app/',
+    'Mobile:components/',
+    'Mobile:utils/',
+  ]}>
+  Table, RPC and storage usage was extracted by scanning every `.ts`/`.tsx` file
+  in both repositories for Supabase client calls, including multi-line calls. The
+  inventories below are complete for source; whether each object exists in the
+  live database is a separate question — see
+  [Schema provenance](/docs/backend/schema-provenance).
+</Status>
+
+## The shape of the coupling
+
+```mermaid
+flowchart TB
+  subgraph MOB["Mobile — execution layer"]
+    direction TB
+    MA["(admin) group<br/>7 screens"]
+    MP["(packer) group<br/>4 screens"]
+  end
+
+  subgraph SB["Supabase — one project"]
+    direction TB
+    SH["26 SHARED TABLES"]
+    SM["8 Mobile-only tables"]
+    SW["28 website-only tables"]
+    RPC["1 shared RPC<br/>get_user_email_by_username"]
+  end
+
+  subgraph WEB["website — commercial + reporting layer"]
+    direction TB
+    WI["20 internal routes"]
+    WP["5 portal routes"]
+    WS["server/api webhook"]
+  end
+
+  MA --> SH
+  MP --> SH
+  MP --> SM
+  WI --> SH
+  WI --> SW
+  WP --> SW
+  WS --> SW
+  MA --> RPC
+  WI --> RPC
+```
+
+**There is exactly one shared function contract.** Everything else is shared
+state. That is the single most important fact for change safety: there is no
+versioned interface to protect either side, so nothing fails loudly when one
+application changes an assumption the other depends on.
+
+## The 26 shared tables
+
+Both applications read or write every table below.
+
+| Domain | Shared tables |
+| --- | --- |
+| Orders | `orders`, `order_packages`, `package_info`, `package_items`, `packing_types` |
+| Team | `order_team_members`, `profiles`, `roles` |
+| Execution | `attendance_logs`, `task_logs`, `task_assignments`, `task_packages` |
+| Materials | `materials`, `material_variants`, `material_tags`, `material_variant_tags`, `order_package_materials`, `units_of_measure` |
+| Securing | `beam`, `securing_template`, `order_package_securing` |
+| Suppliers | `suppliers`, `supplier_pricing` |
+| Reference | `clients`, `app_settings`, `tags` |
+
+## Application-exclusive surface
+
+| | Count | Notable |
+| --- | --- | --- |
+| `Mobile` only | 8 | `packer_sessions`, `tasks`, `order_media`, `packer_availability_status`, `task_status_view`, `user_effective_permissions` |
+| `website` only | 28 | the whole allocation subsystem, the package-instance and packed-item layer, `qr_codes`, reporting tables, `client_portal_settings`, request/approval tables, `supplier_email_messages`, `signatures`, `items_db`, `media` |
+
+The division of labour is real and worth naming: **`Mobile` owns execution**
+(who is on site, what they did, when) and **`website` owns commerce and
+reporting** (what was allocated, what was packed into which box, what the client
+is shown).
+
+## The single shared RPC
+
+`get_user_email_by_username` — called by both applications during sign-in, to
+translate a username into an email before `signInWithPassword`.
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="auth.getUserByUsername" />
+- <SourceRef repo="website" path="src/lib/supabase.ts" symbol="auth.signInWithUsername" />
+
+Mobile's own comment states it *"bypasses RLS policies since it runs with
+elevated privileges"* — strong evidence it is `SECURITY DEFINER`, though its
+definition is in no repository. Because it is the only shared function, **it is
+also the only single point of failure that would break sign-in in both
+applications at once.**
+
+## Directional data flows
+
+```mermaid
+flowchart LR
+  subgraph M["Mobile writes"]
+    M1["attendance_logs"]
+    M2["task_logs · task_assignments"]
+    M3["order_team_members<br/>+ is_team_lead"]
+    M4["package_items"]
+    M5["order_media bucket"]
+  end
+
+  subgraph W["website writes"]
+    W1["orders · order_packages"]
+    W2["order_item_allocation<br/>destinations"]
+    W3["materials · material_variants<br/>supplier_pricing"]
+    W4["profiles via create-user"]
+    W5["order_pkg_instance · pkd_item"]
+  end
+
+  M1 -->|"read by"| WA["Attendance sections<br/>+ cleaner modal"]
+  M2 -->|"read by"| WB["Order detail<br/>task views"]
+  M3 -->|"managed by"| WC["add_team_lead<br/>remove_team_lead"]
+  M4 -->|"feeds"| W5
+  M5 -.->|"DIFFERENT BUCKET"| WD["reports read media"]
+
+  W1 -->|"read by"| MB["Mobile order screens"]
+  W3 -->|"read by"| MC["Mobile inventory"]
+  W4 -->|"authenticates in"| MD["Mobile sign-in"]
+```
+
+### Mobile produces, website consumes
+
+| Data | Produced by | Consumed by | Confidence |
+| --- | --- | --- | --- |
+| `attendance_logs` rows | Mobile packer attendance screen | website attendance section, attendance cleaner modal | VERIFIED |
+| `task_logs` / `task_assignments` state | Mobile pause/resume/complete RPCs | website order detail | VERIFIED |
+| `order_team_members` + `is_team_lead` | Mobile assignment RPCs | website team-lead management, `get_packer_assignment_status` | VERIFIED |
+| `package_items` | Mobile packing screens | website package/report views | VERIFIED |
+| Package photos | Mobile → bucket `order_media` | website reads bucket `media` — **mismatch, see below** | VERIFIED as divergence |
+
+### website produces, Mobile consumes
+
+| Data | Produced by | Consumed by | Confidence |
+| --- | --- | --- | --- |
+| `orders`, `order_packages` | website order creation | Mobile admin and packer screens | VERIFIED |
+| `materials`, `material_variants`, `supplier_pricing` | website approval RPCs | Mobile inventory screens | VERIFIED |
+| `profiles` rows | website via the `create-user` Edge Function | Mobile sign-in and role routing | VERIFIED |
+| Allocation state | website allocation RPCs | Mobile reads `orders`/`order_packages` downstream of it | PARTIAL |
+
+## Shared business rules
+
+Rules that both applications depend on but neither owns:
+
+| Rule | Where it lives | Confidence |
+| --- | --- | --- |
+| Username sign-in resolves through one RPC | database function, called by both | VERIFIED |
+| Role name decides application access | duplicated in four places, inconsistently | VERIFIED — see [Roles and permissions](/docs/website/roles-and-permissions) |
+| Team-lead status is **per order**, not a global role | `order_team_members.is_team_lead` | VERIFIED |
+| Team leads may manage attendance for their order | `can_user_mark_attendance`, `SECURITY DEFINER` | VERIFIED |
+| A packer has at most one active order | `profiles.current_order_id` exists; enforcement mechanism unknown | REQUIRES LIVE DATABASE VERIFICATION |
+| Packed date must not move when a box is reworked | recorded in a Trail log, implemented in an RPC that was reverted | PARTIAL — see [W6](/docs/workflows/w6-packing-evidence) |
+
+## Breaking-change hotspots
+
+Ranked by how much breaks if you change them.
+
+### 1. `profiles` — highest risk in the system
+
+28 inbound foreign keys, read by both applications on **every** sign-in, and the
+carrier of `role_id`, `status`, `client_id`, `current_order_id` and
+`packer_status`. A change here can lock every user out of both applications
+simultaneously.
+
+### 2. `roles.name` values
+
+Four independent hardcoded role checks depend on these strings: website page
+access, Mobile route guards, the `create-user` Edge Function, and at least one
+`SECURITY DEFINER` function. Renaming a role breaks all four, in different ways,
+with no compile-time error anywhere.
+
+### 3. `orders`
+
+12 inbound foreign keys, and two unconstrained status strings whose vocabulary
+lives only in application code. Adding a status value that one application does
+not recognise is silent.
+
+### 4. `order_team_members`
+
+Written by Mobile, managed by website, and the basis of the team-lead
+authorization path. It also has a unique constraint on `(order_id, packer_id)`
+that an `ON CONFLICT` clause depends on.
+
+### 5. `attendance_logs` and `task_logs`
+
+Mobile writes, website reads and remediates. These are the two tables whose RLS
+policies are the only ones written down anywhere — and one of the two policies
+references a column that does not exist.
+
+### 6. The two storage buckets
+
+:::danger Divergent buckets
+
+`website` reads and writes bucket **`media`** (6 call sites). `Mobile` uploads
+package photos to bucket **`order_media`** (1 call site,
+<SourceRef repo="Mobile" path="utils/api/supabase.ts" />), then derives a public
+URL for them.
+
+Only `media` appears in the schema snapshot. Whether `order_media` exists, and
+whether Mobile-uploaded imagery is reachable by the website report path,
+**requires live verification** —
+[OQ-015](/docs/reference/open-questions#oq-015).
+
+:::
+
+## Before you change anything shared
+
+Work through the
+[cross-application impact checklist](./cross-app-impact-checklist). The short
+version: name every object you touch, grep for it in **both** repositories, and
+state the cross-application impact in your pull request — because nothing else
+in the system will tell you.

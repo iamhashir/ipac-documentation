@@ -1,0 +1,268 @@
+---
+title: ADR-0003 — Report packed-date semantics
+sidebar_label: ADR-0003 · Report packed date
+description: The packed-date rule for client reports, its stated rationale, the production change that was applied and reverted, and why the current live behaviour cannot be confirmed.
+---
+
+# ADR-0003 — Report packed-date semantics
+
+```text
+Status:              Historical / Current state unresolved
+Date:                2026-08-08 applied and reverted · 2026-08-11 client behaviour committed
+Decision owners:     Not recorded
+Evidence confidence: HIGH historically · PARTIAL currently · server side UNVERIFIED
+```
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:Trail/packed-date-report-conflict-log.md',
+    'website:Trail/box-snapshots-2026-08-10.json',
+    'website:src/features/reports/components/PackingListPage.tsx',
+    'website:src/features/reports/types.ts',
+    'website:inspect_rpc.js',
+  ]}>
+  This ADR is deliberately split three ways. The history is documented in detail by an
+  incident log. The **client** behaviour is verified from committed code. The
+  **server** behaviour — which SQL is live in `fetch_report_instances` today —
+  **cannot be established from source** and must not be assumed. See
+  [OQ-024](/docs/reference/open-questions#oq-024).
+</Status>
+
+## Context
+
+A client packing list answers "which boxes were packed, in this date range, for this
+destination". The answer depends entirely on what "packed date" means, and there are
+three candidate sources in the schema:
+
+| Candidate | Meaning |
+| --- | --- |
+| `order_pkg_instance.packed_at` | when the box was declared packed |
+| `MAX(pkd_item.created_at)` | when the last item was recorded into the box |
+| `task_logs.end_time` | when the packing task finished |
+
+These diverge whenever a box is reopened, reworked, or has items added later.
+
+## Problem
+
+Reports were showing dates and box counts that did not match an operational
+source-of-truth spreadsheet for one client order. The investigation is recorded in
+<SourceRef repo="website" path="Trail/packed-date-report-conflict-log.md" />.
+
+Two distinct defects emerged:
+
+1. **The report used the wrong date source.** With `MAX(pkd_item.created_at)`, the
+   report date moved whenever item rows were added — so a box packed in July could
+   report a June date, or drift later after rework.
+2. **The client was destroying the original date.** The packing list page previously
+   wrote:
+
+   ```ts
+   packed_at: status === "packed" ? new Date().toISOString() : null
+   ```
+
+   Moving a box *away* from `packed` therefore set `packed_at` back to `null`,
+   discarding the original packed date permanently.
+
+## Decision
+
+### HISTORICALLY VERIFIED — what was decided and applied on 2026-08-08
+
+**Server.** A migration named `prefer_instance_packed_at_in_reports` was applied to
+the live project, changing the report date in `fetch_report_instances` to:
+
+```sql
+COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))
+```
+
+replacing:
+
+```sql
+MAX(pkd_item.created_at)
+```
+
+**The rationale, stated verbatim in the log:**
+
+> The migration intentionally does not use `task_logs.end_time`, because
+> reopening/reworking a box should not move the original packed date.
+
+This is the only business rule in IPAC recorded together with its reason. It is the
+core of this ADR: **the packed date is the date a box was *first* declared packed, and
+nothing later may move it.**
+
+**Client.** The write rule became:
+
+```text
+If status becomes packed AND packed_at is empty  → set packed_at = now
+If packed_at already exists                      → keep it
+If status changes away from packed               → do NOT clear packed_at
+```
+
+**Data.** 19 boxes whose `packed_at` was `null` were backfilled from the spreadsheet
+at `12:00:00+00`. No dimensions, weights, quantities, task logs, `pkd_item.created_at`,
+`packed_by` or statuses were changed.
+
+### The measured effect
+
+For one order filtered to one destination over a two-week window:
+
+| Report date logic | Boxes shown |
+| --- | --- |
+| `MAX(pkd_item.created_at)` | **11** |
+| `COALESCE(instance.packed_at, MAX(pkd_item.created_at))` | **22** |
+
+The log is careful that the 22 were not all from the spreadsheet: 19 backfilled rows
+plus 3 that already had reportable items and a parent package status of `packed`.
+
+A date-logic change doubled a client-facing report. That is the scale of consequence
+this ADR exists to preserve.
+
+### HISTORICALLY VERIFIED — the revert, same day
+
+All value-affecting changes were reverted on **2026-08-08**, with verification
+recorded:
+
+- the 19 `packed_at` values were set back to `null` (19/19 confirmed)
+- `fetch_report_instances` was reverted to `max(pi.created_at) AS last_packed_at`
+- the local UI changes were reverted
+- the same report filter returned **11** boxes again
+
+## Alternatives
+
+`task_logs.end_time` **was** explicitly considered and **explicitly rejected**, with
+the reason recorded. That is the one genuine alternatives entry in these ADRs.
+
+Any other alternative — a dedicated status-history table, an event log, a
+first-packed trigger — **Not recorded.**
+
+## Consequences
+
+### Positive
+
+- **The rule is written down with its reason.** Anyone tempted to "improve" the report
+  by using task end times will find the argument against it.
+- **The client no longer destroys the original date** — verified live in committed
+  code (below).
+- **A dated audit trail exists**, including a before/after table per box and a
+  production snapshot in `Trail/box-snapshots-2026-08-10.json`.
+
+### Negative
+
+- **Neither the migration nor its revert is in any repository.** A named migration was
+  applied to production and rolled back, and the only record is prose in a Trail log.
+  See [Schema provenance](/docs/backend/schema-provenance).
+- **Production data was edited to investigate a reporting question**, with a
+  hand-rolled JSON backup rather than a reversible migration.
+- **The end state is ambiguous** — see Current State.
+
+### Risks
+
+- **A client-visible number can change by 2× from one `COALESCE`.** Any future change
+  here needs a before/after count on real data, exactly as this investigation did.
+- **Client and server may now disagree.** If the RPC is still `MAX`-only while the
+  client preserves `packed_at`, the client is maintaining a field the report ignores —
+  and a code comment says otherwise.
+- **`packed_at` is only ever set by the website packing list page.** No trigger is
+  evidenced. Boxes packed through any other path may have `packed_at` null
+  indefinitely and fall back to item timestamps.
+
+## Current State
+
+This is the part that must not be overstated.
+
+### CURRENTLY VERIFIED — the client
+
+Commit `04fcc93` (2026-08-11, `iamhashir`) — the most recent commit in `website` —
+**committed the write-once behaviour**, and it is present at HEAD in
+<SourceRef repo="website" path="src/features/reports/components/PackingListPage.tsx" />:
+
+```ts
+// Keep the first packed timestamp stable when a box is reopened.
+// The report RPC uses this value in preference to later item activity.
+const { data: currentInstance } = await supabase
+  .from("order_pkg_instance")
+  .select("packed_at")
+  .eq("id", inst.id)
+  .single();
+
+const packedAt =
+  currentInstance?.packed_at ??
+  (status === "packed" ? new Date().toISOString() : null);
+```
+
+The same commit updated <SourceRef repo="website" path="src/features/reports/types.ts" />
+so its comment now reads: `item_packed_at` uses *"order_pkg_instance.packed_at, falling
+back to MAX(pkd_item.created_at)"*.
+
+Also verified, from <SourceRef repo="website" path="inspect_rpc.js" />:
+
+```text
+fetch_report_instances(p_client_id, p_order_ids, p_date_from, p_date_to,
+                       p_date_mode, p_destinations, p_has_items_only, p_tag_ids)
+```
+
+`p_date_mode` accepts at least `item_packed_at`.
+
+### REQUIRES LIVE DATABASE VERIFICATION — the server
+
+:::danger Do not claim which SQL is live
+
+The incident log states the RPC was reverted to `MAX(pkd_item.created_at)` on
+2026-08-08. Three days later, commit `04fcc93` shipped client code whose comments
+assert that the RPC prefers `order_pkg_instance.packed_at`.
+
+Both readings are consistent with the evidence, and **source cannot distinguish
+them**:
+
+| Reading | Implication |
+| --- | --- |
+| The migration was re-applied after 2026-08-08 | The `COALESCE` logic is live and the client comments are accurate |
+| The revert stands | The client preserves a `packed_at` the report **ignores**, and two code comments are wrong |
+
+Under the second reading, a box reopened and repacked keeps its original `packed_at`
+while the report still moves its date — the exact defect this work set out to fix.
+
+**Verify the live function body before changing anything here.**
+[OQ-024](/docs/reference/open-questions#oq-024).
+
+:::
+
+One further unresolved thread: a migration file named
+`add_packing_start_completion_date_modes` exists as an **uncommitted** file in a
+superseded local checkout. Its name implies additional date modes were explored after
+this episode. Whether it was ever applied is unknown.
+
+## Evidence
+
+| Claim | Source | Confidence |
+| --- | --- | --- |
+| Migration `prefer_instance_packed_at_in_reports` was applied | Trail log | HISTORICALLY VERIFIED |
+| New logic was `COALESCE(instance.packed_at, MAX(pkd_item.created_at))` | Trail log | HISTORICALLY VERIFIED |
+| Prior logic was `MAX(pkd_item.created_at)` | Trail log | HISTORICALLY VERIFIED |
+| `task_logs.end_time` rejected, with reason | Trail log, quoted verbatim | HISTORICALLY VERIFIED |
+| 19 rows backfilled, then reverted to null | Trail log, with per-box table | HISTORICALLY VERIFIED |
+| Report count 11 → 22, then 11 again | Trail log | HISTORICALLY VERIFIED |
+| Everything reverted on 2026-08-08 | Trail log, with post-revert verification | HISTORICALLY VERIFIED |
+| Client write-once behaviour is live | commit `04fcc93`, present at HEAD | **CURRENTLY VERIFIED** |
+| Client comments assert the RPC prefers `packed_at` | `types.ts`, `PackingListPage.tsx` | **CURRENTLY VERIFIED** as a claim in code |
+| RPC signature and `item_packed_at` mode | `inspect_rpc.js` | CURRENTLY VERIFIED |
+| Which SQL is live in `fetch_report_instances` | — | **REQUIRES LIVE DATABASE VERIFICATION** |
+| Whether the migration still exists in the project | — | **REQUIRES LIVE DATABASE VERIFICATION** |
+| Full set of `p_date_mode` values | — | **REQUIRES LIVE DATABASE VERIFICATION** |
+| Whether `add_packing_start_completion_date_modes` was applied | — | **REQUIRES LIVE DATABASE VERIFICATION** |
+| Who decided | — | **Not recorded** |
+| Whether the client change was intended to accompany a re-applied migration | — | **Not recorded** |
+
+## Related Documentation
+
+- [W6 — Packing evidence and report dates](/docs/workflows/w6-packing-evidence) — the workflow this rule governs
+- [Database model](/docs/backend/database-model) — the four package layers and `order_pkg_instance`
+- [Schema provenance](/docs/backend/schema-provenance) — why the migration is not in any repository
+- [Your first change](/docs/guides/getting-started/first-change) — the MEDIUM-risk example points here
+
+## Open Questions
+
+- [OQ-024](/docs/reference/open-questions#oq-024) — **which report packed-date logic is live today.** The blocking question for this ADR; resolving it turns the status from Unresolved to Accepted or Superseded.
+- [OQ-011](/docs/reference/open-questions#oq-011) — where migrations should live. This episode is the strongest argument for versioning them.
+- **Is `packed_at` ever set outside the website packing list page?** No trigger is evidenced. If not, boxes packed by any other route keep a null `packed_at` and silently fall back to item timestamps.

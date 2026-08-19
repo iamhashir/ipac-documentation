@@ -1,0 +1,188 @@
+---
+title: ADR-0001 — Web application framework
+sidebar_label: ADR-0001 · Web framework
+description: The evidenced decision to rebuild the IPAC admin web application from Expo Web onto TanStack Start, and what it still implies.
+---
+
+# ADR-0001 — Web application framework: Expo Web to TanStack Start
+
+```text
+Status:              Accepted
+Date:                2026-02-06 (first commit of the rewrite)
+Decision owners:     Not recorded
+Evidence confidence: HIGH — the motivation is stated in the repository itself
+```
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:README.md',
+    'website:package.json',
+    'website:nitro.config.ts',
+    'website:git log',
+    'Mobile:package.json',
+    'Mobile:app.json',
+  ]}>
+  Unusually for IPAC, this decision's **rationale is written down in the repository**
+  — `website/README.md` states the problem and the expected improvement explicitly.
+  That is why this ADR can be Accepted rather than Historical. Individual performance
+  figures are the repository's own claims, not independently measured.
+</Status>
+
+## Context
+
+The IPAC admin interface was originally built with **Expo Web (React Native Web)** —
+the same stack as the field application, sharing its component model. That let one
+codebase target native and web.
+
+`Mobile` still carries that capability: `react-native-web` is a dependency, and
+`app.json` configures a web target with the Metro bundler and `static` output. The
+`(admin)` route group in `Mobile` also still contains administrative screens, and the
+repository's own architecture notes warn that these older mobile admin screens still
+exist and that current usage should be verified before treating them as intended
+architecture.
+
+## Problem
+
+Stated verbatim in <SourceRef repo="website" path="README.md" />:
+
+> The original admin panel was built with Expo Web (React Native Web), which had
+> severe performance issues:
+>
+> - **LCP of 30-80 seconds** due to massive bundle size
+> - No SSR/SSG - everything client-side rendered
+> - Font loading blocked rendering
+> - Cascading auth checks caused waterfall requests
+
+An LCP measured in **tens of seconds** is not a tuning problem. React Native Web
+ships a native-oriented component and styling runtime to the browser, and the
+resulting bundle is described as ~2–5 MB. Four distinct causes are named: bundle
+size, absence of server rendering, render-blocking fonts, and sequential
+authentication requests.
+
+## Decision
+
+Rebuild the admin interface as a **separate web application on TanStack Start**,
+abandoning code sharing with the React Native application.
+
+The stack, verified from <SourceRef repo="website" path="package.json" />:
+
+| Concern | Choice |
+| --- | --- |
+| Framework | TanStack Start with TanStack Router |
+| Server data | TanStack Query, with SSR query integration |
+| Build | Vite 7 |
+| Server runtime | Nitro, preset `vercel` (<SourceRef repo="website" path="nitro.config.ts" />) |
+| UI | React 19, Tailwind CSS 4, DaisyUI, Radix primitives |
+| Validation | Zod |
+| Quality | Vitest, Biome |
+
+The rewrite is clean: `website/package.json` contains **no** `react-native` or `expo`
+dependency. The first commit is dated **2026-02-06**, authored by `ax7k`.
+
+The expected improvement, again from the README:
+
+> - **Sub-second LCP** with SSR and streaming
+> - **~100-200KB initial bundle** vs ~2-5MB
+> - Built-in caching with TanStack Query
+> - Type-safe routing with TanStack Router
+
+## Alternatives
+
+**Not recorded.**
+
+No repository artifact evaluates alternatives. Optimising Expo Web in place, or
+choosing a different SSR framework, may have been considered — nothing states it.
+The four named causes suggest server rendering was treated as the necessary remedy,
+but that is inference and is not documented as a comparison.
+
+## Consequences
+
+### Positive
+
+- **Server rendering and streaming became possible**, addressing the root cause
+  rather than the symptom.
+- **A web-appropriate UI stack.** Tailwind, DaisyUI and Radix replace native-oriented
+  primitives, and Radix brings accessible component behaviour that React Native Web
+  does not provide.
+- **Type-safe routing** with generated route types.
+- **Real quality gates.** `website` has typecheck, lint, tests and two CI workflows.
+  `Mobile` has none of these — see
+  [Build and release](/docs/mobile/build-and-release).
+- **The web application grew far beyond an admin panel.** It now carries 20 internal
+  routes plus a 5-route client portal, a server webhook, and a 12,186-line reporting
+  module — scope that the original shared-code approach would have struggled to
+  support.
+
+### Negative
+
+- **Two codebases, no shared UI.** Every shared concept must be implemented twice.
+  There is no shared component library, no shared validation, no shared types
+  package.
+- **The applications diverged in quality practice**, not just in code. One has
+  automated gates and CI; the other has neither.
+- **Duplicated domain logic.** Both applications independently construct Supabase
+  queries against the same 26 shared tables, and both hardcode role checks — see
+  [ADR-0003](./adr-0003-report-packed-date) and
+  [Roles and permissions](/docs/website/roles-and-permissions).
+- **The old surface was not removed.** Administrative screens still exist in `Mobile`,
+  so for some workflows it is unclear which application is authoritative.
+
+### Risks
+
+- **Overlapping admin surfaces.** Until the `Mobile` `(admin)` screens are confirmed
+  legacy or current, a change may need making in two places — or may be made in the
+  wrong one.
+- **Divergence accelerates.** With no shared contract layer and only one shared RPC,
+  the two applications can drift apart silently. See
+  [Cross-application architecture](/docs/guides/architecture/cross-app).
+- **The performance claims are unverified.** "Sub-second LCP" is the repository's
+  stated expectation. No measurement exists in either repository. `web-vitals` is a
+  dev dependency, so instrumentation may exist, but no results are recorded.
+- **Size discipline was not carried over.** The repository sets a 400-line hard limit
+  and has files of 4,218, 3,595 and 2,765 lines.
+
+## Current State
+
+**In effect.** `website` is the production admin application, deployed to Vercel via
+GitHub Actions, and has been developed continuously from 2026-02-06 to at least
+2026-08-11.
+
+The decision is settled. Two of its consequences are not:
+
+1. Whether the `Mobile` `(admin)` screens are legacy or still authoritative for any
+   workflow.
+2. Whether the performance goals were met — no measurement is recorded.
+
+## Evidence
+
+| Claim | Source | Confidence |
+| --- | --- | --- |
+| Prior stack was Expo Web / React Native Web | `website/README.md`; `Mobile` retains `react-native-web` and a web target in `app.json` | VERIFIED |
+| LCP 30–80s, ~2–5 MB bundle, no SSR, blocking fonts, waterfall auth | `website/README.md` — the repository's own claim | VERIFIED as a stated claim, not as a measurement |
+| Current stack | `website/package.json`, `nitro.config.ts` | VERIFIED |
+| Clean rewrite, no RN/Expo dependency | `website/package.json` contains no match for `react-native` or `expo` | VERIFIED |
+| Rewrite began 2026-02-06 | `git log --reverse`, commit `7d7c391` by `ax7k` | VERIFIED |
+| Older mobile admin screens still exist | `Mobile/app/(admin)/`; warning in `website/docs/ARCHITECTURE.md` | VERIFIED |
+| Sub-second LCP achieved | — | **NOT VERIFIED** — no measurement in either repository |
+| Who made the decision | — | **Not recorded** |
+| Alternatives considered | — | **Not recorded** |
+
+## Related Documentation
+
+- [website architecture](/docs/guides/architecture/website-architecture)
+- [Mobile architecture](/docs/guides/architecture/mobile-architecture)
+- [Cross-application architecture](/docs/guides/architecture/cross-app)
+- [ADR-0002 — Repository migration](./adr-0002-repository-migration)
+
+## Open Questions
+
+- **Are the `Mobile` `(admin)` screens legacy or current?** Not tracked as a numbered
+  open question; it needs a product answer, and it determines whether a workflow has
+  one home or two.
+- **Were the performance goals met?** No measurement exists. If it matters, measure
+  before assuming.
+- [OQ-005](/docs/reference/open-questions#oq-005) — the README's feature status is
+  stale, which is a reminder that this same README's performance claims are equally
+  undated.

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="IPAC">
+  <title>IPAC</title>
+  <path d="M16 2.5 29 9.2v13.6L16 29.5 3 22.8V9.2Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+  <path d="M3 9.2 16 15.9l13-6.7M16 15.9v13.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" opacity="0.75"/>
+</svg>

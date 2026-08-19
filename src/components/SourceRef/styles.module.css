@@ -1,0 +1,38 @@
+.resolved,
+.unresolved {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  /* Long repository paths must break rather than push the page sideways on
+     narrow screens. inline-flex will not shrink without min-width: 0. */
+  max-width: 100%;
+  min-width: 0;
+}
+
+.resolved code,
+.unresolved code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.symbol {
+  font-size: 0.8rem;
+  color: var(--ipac-muted);
+}
+
+.symbol::before {
+  content: '→ ';
+}
+
+.note {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ipac-accent);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 0.3rem;
+  white-space: nowrap;
+}

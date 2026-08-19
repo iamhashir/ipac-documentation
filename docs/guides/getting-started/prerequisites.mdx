@@ -1,0 +1,58 @@
+---
+title: Prerequisites
+sidebar_label: Prerequisites
+description: Tooling and access required before either IPAC application will run locally.
+---
+
+# Prerequisites
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'Mobile:.nvmrc',
+    'Mobile:package.json',
+    'Mobile:README.md',
+    'website:package.json',
+    'website:.github/workflows/',
+  ]}>
+  Tooling requirements were read directly from configuration files. The
+  supported Node version is contradictory across sources and is recorded as
+  [OQ-006](/docs/reference/open-questions#oq-006) — the guidance below is the
+  safest reading of that conflict, not a confirmed standard.
+</Status>
+
+## Tooling
+
+| Tool | Needed for | Notes |
+| --- | --- | --- |
+| Node.js | Both applications | `Mobile` pins **22.19.0** in `.nvmrc`. `website` validates pull requests on 22.x but builds production on 24.x. See [OQ-006](/docs/reference/open-questions#oq-006). |
+| npm | Both applications | Both repositories commit `package-lock.json`; use npm, not another package manager. |
+| Git | Both applications | — |
+| Android Studio | `Mobile` only | Provides the Android SDK and a bundled JDK. Required to build the native development client. |
+| Xcode | `Mobile` on iOS | The app declares tablet support for iOS. iOS builds were not exercised while writing this page. |
+
+Using a Node version manager is strongly advisable given the version conflict.
+Both this documentation repository and `Mobile` carry a `.nvmrc`, so
+`nvm use` picks the right version in those directories.
+
+## Accounts and access
+
+You will need:
+
+- **Repository access.** Both applications are in the **`ipacapps`**
+  organisation — `ipacapps/website` and `ipacapps/Mobile`.
+- **Supabase project access.** Both applications point at the same project.
+  Without it, neither application can authenticate and almost nothing works.
+- **Credentials for local environment files.** Obtain them from a team member or
+  a secret store. They are not, and will never be, in this documentation.
+
+## What will not work
+
+- **Expo Go will not run `Mobile`.** The project depends on
+  `expo-dev-client`, which requires a native development build. This is the most
+  common source of lost time for a new developer — see
+  [`Mobile` setup](./mobile-setup).
+- **Nothing runs against a local database.** There is no local Postgres setup in
+  either repository; both applications talk to the shared hosted Supabase
+  project. Treat every local action as acting on shared infrastructure.

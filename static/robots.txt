@@ -1,0 +1,5 @@
+# The IPAC documentation site is internal and must not be indexed.
+# Remove or relax this file only after a deliberate decision to make
+# the site public. See docs/reference/open-questions.
+User-agent: *
+Disallow: /

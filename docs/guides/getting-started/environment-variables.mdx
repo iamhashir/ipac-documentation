@@ -1,0 +1,125 @@
+---
+title: Environment variables
+sidebar_label: Environment variables
+description: Environment variable names used by the IPAC applications, and the rules for handling their values.
+---
+
+# Environment variables
+
+**Names only.** This page lists which variables exist and what they are for. It
+contains no values, and no page on this site ever will.
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:.env.example',
+    'website:CLAUDE.md',
+    'website:.github/workflows/ci-cd.yml',
+    'Mobile:.env.example',
+    'website:docs/DEVELOPMENT.md',
+  ]}>
+  Client variable names were read from each repository's `.env.example` and CI
+  workflow. The server-only names are reproduced from
+  `website/docs/DEVELOPMENT.md` and were not independently confirmed against
+  running server code.
+</Status>
+
+## Rules
+
+1. **Never commit a real value.** Not to a repository, not to this site.
+2. **Never put a secret or service-role key in a client-visible variable.**
+   Anything prefixed `VITE_` or `EXPO_PUBLIC_` is shipped to the browser or the
+   device and must be treated as public.
+3. **Never paste a key into documentation, a log, a ticket, or an assistant
+   prompt.** Pasting into a prompt is disclosure.
+4. **Get values from a person or a secret store**, and keep them in your local
+   `.env`, which is git-ignored.
+
+## website
+
+Client-side, from `.env.example`:
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `VITE_ENABLE_TANSTACK_DEVTOOLS` | Optional. Enables TanStack devtools |
+
+Additional variables appear in the deployment workflow and are injected at build
+time as release metadata rather than configuration:
+
+`VITE_APP_VERSION`, `VITE_RELEASE_TYPE`, `VITE_RELEASE_FEATURES`, and the
+Vercel-provided `VERCEL_GIT_COMMIT_SHA`, `VERCEL_GIT_COMMIT_MESSAGE`,
+`VERCEL_GIT_COMMIT_DATE`.
+
+Deployment also requires `VERCEL_TOKEN`, `VERCEL_ORG_ID` and
+`VERCEL_PROJECT_ID` as GitHub Actions secrets.
+
+## Mobile
+
+From `.env.example`:
+
+| Variable | Purpose |
+| --- | --- |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `EXPO_PUBLIC_APP_NAME` | Application display name |
+| `EXPO_PUBLIC_APP_VERSION` | Application version string |
+
+:::danger `app.json` wins — `.env` does not work for Mobile
+
+`Mobile/utils/api/supabase.ts` resolves configuration in this order:
+
+```text
+1. Constants.expoConfig.extra.supabaseUrl        ← app.json, COMMITTED
+2. process.env.EXPO_PUBLIC_SUPABASE_URL          ← .env, fallback only
+```
+
+Because `app.json` ships real values in `extra.supabaseUrl` and
+`extra.supabasePublishableKey`, **the fallback is never reached**. Setting
+`EXPO_PUBLIC_SUPABASE_URL` in `.env` has no effect, and there is currently no way
+to build `Mobile` against a different backend without editing `app.json`.
+
+The same file also prints both values to the console on every launch. See
+[M2](/docs/security/findings#m2).
+
+:::
+
+## Server-only
+
+These must never reach a client bundle. Verified by reading
+`website/server/api/webhooks/resend/inbound.post.ts` and
+`Mobile/supabase/functions/create-user/index.ts` directly:
+
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `SUPABASE_URL` | webhook, Edge Function | Project URL, server context |
+| `SUPABASE_SECRET_KEY` | webhook (**preferred**) | Secret key for privileged access |
+| `SUPABASE_SERVICE_ROLE_KEY` | webhook (fallback), Edge Function | Service-role key — full database access, **bypasses row level security** |
+| `RESEND_INBOUND_WEBHOOK_SECRET` | webhook | Verifies inbound supplier email via svix signatures |
+| `RESEND_API_KEY` | website server | Outbound supplier email |
+| `RESEND_FROM_EMAIL`, `RESEND_CC_EMAIL`, `RESEND_REPLY_TO_EMAIL` | website server | Supplier email addressing |
+
+A service-role key bypasses row level security entirely. It belongs only in
+server-side or Edge Function contexts. The one Edge Function performs privileged
+user creation using it.
+
+:::warning Multiple fallback names for the same secret
+
+The Edge Function resolves its key from `SUPABASE_SERVICE_ROLE_KEY`, then
+`SERVICE_ROLE_KEY`, then `AUTH_SECRET_KEY`. The webhook tries `SUPABASE_SECRET_KEY`
+then `SUPABASE_SERVICE_ROLE_KEY`.
+
+Two consequences: it is ambiguous which name is authoritative, and **you cannot
+prove a key has been fully rotated** without checking every name in every
+environment. Recorded as [M7](/docs/security/findings#m7).
+
+:::
+
+## This documentation site
+
+The documentation site requires **no environment variables at all**. It is a
+static build with no backend and no secrets. That is deliberate: it means the
+site can be built by anyone who can clone the repository, and there is nothing
+in its deployment pipeline to leak.

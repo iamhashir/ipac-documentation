@@ -1,0 +1,99 @@
+---
+title: Troubleshooting
+sidebar_label: Overview
+description: Practical fixes for problems that have actually happened in IPAC, drawn from incident logs, fix commits and configuration — plus what cannot be diagnosed without live database access.
+---
+
+# Troubleshooting
+
+Every entry in this section describes a problem that **actually occurred** in
+IPAC, with a root cause taken from an incident log, a fix commit, or
+configuration that can be read directly. Nothing here is a guess at what might go
+wrong.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'Mobile:Trail/login-hashir-1.md',
+    'Mobile:git log',
+    'Mobile:babel.config.js',
+    'Mobile:WARP.md',
+    'website:.github/workflows/',
+    'website:src/lib/supabase.ts',
+  ]}>
+  Sources are named per entry. Where a fix is reproduced from a commit or incident
+  log, that is stated. Where a symptom's cause **cannot** be confirmed without
+  querying the live database, the entry says so instead of guessing.
+</Status>
+
+## Pick your symptom
+
+| Symptom | Go to |
+| --- | --- |
+| Login fails with `Database error querying schema` | [Authentication A1](./authentication#a1) |
+| Valid user gets "Invalid username or password" | [Authentication A2](./authentication#a2) |
+| Stuck on "Loading your profile…" | [Authentication A3](./authentication#a3) |
+| Signed out unexpectedly, or session won't restore | [Authentication A4](./authentication#a4) |
+| Android build fails: `cannot find symbol` in Reanimated/Worklets | [Mobile M1](./mobile#m1) |
+| Android build fails: JSI name collision | [Mobile M2](./mobile#m2) |
+| NativeWind styles not applied | [Mobile M3](./mobile#m3) |
+| Expo Go won't run the app, or dev client won't connect | [Mobile M4](./mobile#m4) |
+| `website` build fails on lint or TypeScript | [website W1](./website#w1) |
+| `website` crashes at startup: missing env vars | [website W2](./website#w2) |
+| `npm run lint` changed my files | [website W3](./website#w3) |
+| Passed PR checks, failed the production deploy | [website W4](./website#w4) |
+| A page renders and then redirects away | [website W5](./website#w5) |
+| Editing `.env` has no effect on Mobile | [Configuration C1](./configuration#c1) |
+| Cannot tell whether Supabase is reachable | [Configuration C2](./configuration#c2) |
+| Setup instructions reference files that don't exist | [Configuration C3](./configuration#c3) |
+
+## How these entries are structured
+
+Each one gives you: **Symptoms** (what you see) · **Likely cause** (evidence-backed
+only) · **Diagnosis** (exact commands) · **Resolution** (what actually worked) ·
+**Do not** (fixes that make it worse) · **Related files** · **Verification**.
+
+The **Do not** section matters as much as the fix. Several of these problems have a
+plausible-looking remedy that causes a second, worse problem.
+
+## What cannot be diagnosed here
+
+:::warning These require live database access, which this documentation has not had
+
+Some of the most likely production symptoms cannot be traced from source. If you
+hit one of these, **do not guess at a cause** — the answer is in the database, and
+the relevant open question is linked.
+
+| Symptom | Why source cannot answer | Open question |
+| --- | --- | --- |
+| A user can sign in but sees no data, or a permission error on read | RLS policies exist in source for only 2 of 63+ tables | [OQ-008](/docs/reference/open-questions#oq-008) |
+| A packer cannot start or resume a session | The `packer_sessions` policy in source references a column that does not exist | [OQ-014](/docs/reference/open-questions#oq-014) |
+| Package photos taken in the field do not appear in reports | The two applications use different storage buckets; neither's configuration is verified | [OQ-015](/docs/reference/open-questions#oq-015) |
+| A client report shows the wrong number of boxes, or wrong dates | The live report date logic is unknown — it was changed and reverted | [OQ-024](/docs/reference/open-questions#oq-024) |
+| A role can do something it should not, or vice versa | The live role set is unconfirmed and four layers disagree | [OQ-002](/docs/reference/open-questions#oq-002) |
+| An order status value is rejected or ignored | The status columns are unconstrained strings with no declared vocabulary | [OQ-012](/docs/reference/open-questions#oq-012) |
+
+:::
+
+## Before you start debugging anything
+
+Two rules, both from the applications' own governance in `website/AGENTS.md`:
+
+1. **Supabase access is read-only by default.** Inspecting schema and querying data
+   to understand a problem is fine. Mutating data, DDL, policies, grants, auth
+   users, storage objects or Edge Functions requires explicit approval.
+2. **Check both applications.** They share 26 tables. A fix applied for one can
+   change behaviour in the other — work through the
+   [cross-application impact checklist](/docs/guides/architecture/cross-app-impact-checklist).
+
+## Recording a new incident
+
+Both application repositories carry a `Trail/` directory for exactly this, with a
+documented convention: `issue-developer-counter.md`, containing **Goal**,
+**Problem**, **Root Cause**, **Fix**. Log an incident there when the bug was not
+obvious from the error message, or when the fix required understanding something
+undocumented.
+
+Then, if the incident is worth a wider audience, add an entry here and link the
+Trail file as evidence. That is exactly how this section was built.

@@ -1,0 +1,105 @@
+---
+title: Introduction
+sidebar_label: Introduction
+description: What the IPAC documentation site covers, what it deliberately does not, and how much you can trust any given page.
+---
+
+# Introduction
+
+IPAC is an operations system for industrial packaging work. It consists of two
+applications that share a single backend:
+
+- **Mobile** — a React Native / Expo application used by field
+  operators, with separate interfaces for administrative users and packers.
+- **website** — a TanStack Start web application used by managers and
+  administrators, which also serves restricted client-facing views.
+
+Both applications talk to the **same Supabase project**: authentication,
+PostgreSQL, row level security, storage, and database functions. That single
+shared backend is the most important fact about this system, and the source of
+most of its risk.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:src/routes/',
+    'Mobile:package.json',
+    'Mobile:app.json',
+    'website:docs/ARCHITECTURE.md',
+  ]}>
+  The application inventory, stacks and shared-backend relationship above were
+  checked directly against both repositories.
+</Status>
+
+## Why this site exists
+
+The system's knowledge currently lives in one developer's head, plus scattered
+files inside the application repositories. That is a bus factor of one. This
+site exists so that a developer who has never seen IPAC can understand the
+system, make a safe change, and know what they are not allowed to assume —
+without needing to ask the person who built it.
+
+## What is canonical here
+
+This site is the **single source of truth** for:
+
+- system architecture and cross-application architecture
+- onboarding
+- workflows
+- the security and access model
+- backend architecture and database concepts
+- mobile application architecture
+- admin application architecture
+- deployment
+- troubleshooting
+- architectural decisions
+
+## What stays in the application repositories
+
+Some material belongs next to the code and must not be moved here:
+
+- agent and assistant instructions (`CLAUDE.md`, `AGENTS.md`, Copilot
+  instructions)
+- code-specific conventions enforced during review
+- temporary development notes
+- internal investigation logs
+- implementation-specific instructions
+
+Whole documents are never duplicated across repositories. Where an application
+repository needs to point at a concept, it links here; where this site needs to
+show implementation detail, it links to the code.
+
+## How much you can trust a page
+
+Every page carries a status banner. It is the mechanism that keeps this site
+honest as it grows.
+
+| Banner | Meaning |
+| --- | --- |
+| **Verified** | Every claim was checked against the listed sources on the stated date. |
+| **Partially Verified** | Some claims were checked; others are inherited from earlier material and not independently confirmed. The page says which. |
+| **Open Question** | A genuine contradiction or gap. It is recorded, not resolved by guessing. |
+
+Two rules follow from this, and they are not negotiable:
+
+1. **Nothing is invented.** No table, role, workflow, or behaviour is described
+   here unless it was observed in the repositories, in the database, or in
+   existing documentation that is cited.
+2. **Contradictions are published, not settled.** Where existing sources
+   disagree, the disagreement is written down on the
+   [Open questions](/docs/reference/open-questions) page until someone verifies
+   the answer against the live system.
+
+If you find a page that contradicts the code, the code is right and the page is
+a bug. Fix it, and update its status banner.
+
+## Where to go next
+
+- **Never worked on IPAC before?** Start with
+  [Getting started](/docs/guides/getting-started/overview).
+- **Need the shape of the system?** Read
+  [System architecture](/docs/guides/architecture/system-overview).
+- **About to change something shared?** Work through the
+  [cross-application impact checklist](/docs/guides/architecture/cross-app-impact-checklist).

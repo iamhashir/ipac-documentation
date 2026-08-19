@@ -1,0 +1,172 @@
+---
+title: ADR-0002 — Repository and organisation migration
+sidebar_label: ADR-0002 · Repository migration
+description: The move from it-ipac/admin-panel to ipacapps/website, the canonical repository set, and why some old identifiers must not be renamed.
+---
+
+# ADR-0002 — Repository and organisation migration
+
+```text
+Status:              Accepted
+Date:                Between 2026-06-05 and 2026-08-19 (exact date Not recorded)
+Decision owners:     Not recorded
+Evidence confidence: HIGH for what changed · NONE for why it changed
+```
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:git remote / git log',
+    'Mobile:git remote / git log',
+    'website:package.json',
+    'Mobile:app.json',
+  ]}>
+  The repository moves are verified from git metadata in both checkouts. The
+  **organisation was confirmed by decision on 2026-08-19**, closing OQ-010. The
+  *reason* for the migration is recorded nowhere and is deliberately left as
+  "Not recorded".
+</Status>
+
+## Context
+
+IPAC's repositories have been renamed and moved at least once, and the old names
+remain visible in git history, in prose inside the applications, and in build
+identifiers. Before this was established, source references in this documentation
+could not be trusted to resolve.
+
+## Problem
+
+Three different owners appeared in the available evidence, and old GitHub URLs
+**redirect** rather than 404 — so a stale remote keeps working and gives no signal
+that it is stale. Without a decision, every source link on this site was a guess.
+
+## Decision
+
+**The canonical organisation is `ipacapps`.** Confirmed 2026-08-19.
+
+The canonical repositories:
+
+```text
+ipacapps/
+├── ipac-documentation
+├── website          (formerly it-ipac/admin-panel)
+└── Mobile
+```
+
+Applied in this repository: `organizationName` and all three repository URLs in
+`docusaurus.config.ts` now use `ipacapps`, and `SourceRef` resolves both application
+repositories to live links.
+
+## Alternatives
+
+**Not recorded.**
+
+No artifact evaluates keeping the repositories under `it-ipac`, or consolidating them
+differently. The rename from `admin-panel` to `website` and the organisation change
+are visible only as outcomes.
+
+## Consequences
+
+### Positive
+
+- **Source references resolve.** Every `SourceRef` on this site links to real code.
+  Before this decision, `Mobile` paths rendered as plain text because inventing a URL
+  was not acceptable.
+- **One place to change.** Repository URLs live in `customFields.repositories` in
+  `docusaurus.config.ts`. If the organisation changes again, one edit updates every
+  link on the site.
+- **`Mobile` is in an organisation, not a personal account.** An earlier checkout of
+  the same application had `origin` and `upstream` pointing at two *personal*
+  accounts. That was the single largest bus-factor risk identified in the audit, and
+  the current remote resolves it.
+- **Two open questions closed** — OQ-001 and OQ-010.
+
+### Negative
+
+- **Old names persist in three places**, and they will keep confusing readers:
+
+  | Location | Still says |
+  | --- | --- |
+  | `website/docs/ARCHITECTURE.md`, `DEVELOPMENT.md`, `ROLES.md` | `admin-panel/` and `ipac_mobile/` |
+  | `Mobile/README.md` | a personal-account clone URL and `cd ipac-operations-app` |
+  | `website/package.json` | `"name": "ipac-admin-panel"` |
+  | `Mobile/app.json` | `slug` and `scheme` of `ipac-operations-app`; Android package `com.ipacoperationsapp.app` |
+
+- **`ipac_mobile` never existed as a directory.** It appears in `website`'s own
+  documents, including a workspace-layout diagram, and would fail a new developer's
+  first `cd`.
+- **The reason is lost.** Nobody reading this will know whether the move was
+  organisational, administrative, or incidental.
+
+### Risks
+
+- **Silent link rot.** Because GitHub redirects old URLs, a wrong organisation name
+  produces links that *work* — so the error is invisible until the redirect stops.
+  This is why the organisation is stated as a decision here rather than inferred.
+- **`ipac-documentation` is unverified.** It is configured as
+  `ipacapps/ipac-documentation` for consistency, but the repository does not exist
+  yet, so no remote confirms it.
+
+:::danger Load-bearing identifiers must not be renamed automatically
+
+`Mobile/app.json` still declares names derived from `ipac-operations-app`. **Do not
+"finish" the rename by changing them.** They are not cosmetic:
+
+| Identifier | Value | Why renaming is a product decision |
+| --- | --- | --- |
+| `android.package` | `com.ipacoperationsapp.app` | This **is** the installed application's identity. Change it and you ship a *different app*: existing installs will not upgrade, and any store listing identity is lost. |
+| `scheme` | `ipac-operations-app` | Backs deep links. Changing it breaks every link already issued. |
+| `slug` | `ipac-operations-app` | Ties the project to its EAS identity, and EAS owns version numbering (`appVersionSource: "remote"`). |
+
+The distinction that matters: **prose names are simply wrong and should be corrected;
+build identifiers are correct as they stand and carry migration consequences.** This
+documentation corrected the prose on its own pages and did not touch either
+application. Tracked as [OQ-003](/docs/reference/open-questions#oq-003).
+
+:::
+
+## Current State
+
+**In effect.** Both application checkouts have exactly one remote each, under
+`ipacapps`. No `it-ipac` remote is configured in either.
+
+Remaining work is in the application repositories, not here: correcting the stale
+prose names, and separately deciding whether the `app.json` identifiers should ever
+change.
+
+## Evidence
+
+| Claim | Source | Confidence |
+| --- | --- | --- |
+| `website` origin is `github.com/ipacapps/website.git` | `git remote -v` | VERIFIED |
+| `Mobile` origin is `github.com/ipacapps/Mobile.git` | `git remote -v` | VERIFIED |
+| No `it-ipac` remote configured in either | `git config --list` | VERIFIED |
+| `website` was formerly `it-ipac/admin-panel` | merge commit `e49f426`, 2026-06-05 — `Merge branch 'main' of https://github.com/it-ipac/admin-panel` | VERIFIED |
+| `it-ipac` was a *head*, not the base | merge commit `74283ee`, 2026-06-29 — `Merge pull request #1 from it-ipac/...` | VERIFIED |
+| An earlier `Mobile` checkout used two personal-account remotes | `git remote -v` on the superseded checkout | VERIFIED |
+| `Mobile` PR #1 came from a personal account | merge commit `b327b43` | VERIFIED |
+| Package name still `ipac-admin-panel` | `website/package.json` | VERIFIED |
+| Build identifiers still derive from the old name | `Mobile/app.json` | VERIFIED |
+| Exact migration date | — | **Not recorded** — bounded to after 2026-06-05 |
+| Reason for the migration | — | **Not recorded** |
+| Whether `it-ipac` was a rename, a transfer, or a fork | — | **Not recorded**; local git metadata cannot distinguish these |
+| Who decided | — | **Not recorded** |
+
+Note the ordering constraint: `e49f426` (2026-06-05) merges *from* `it-ipac/admin-panel`
+into what is now `ipacapps/website`, so the repository still related to `it-ipac` at
+that date. The move therefore happened after 2026-06-05 and was complete by the time
+the checkouts were taken.
+
+## Related Documentation
+
+- [Repositories](/docs/guides/getting-started/repositories) — the canonical set and the historical names
+- [Build and release](/docs/mobile/build-and-release#android-identifiers) — the identifier warning in operational context
+- [Documentation status](/docs/reference/documentation-status) — how `SourceRef` resolves repositories
+- [ADR-0001 — Web application framework](./adr-0001-website-framework) — why `website` exists at all
+
+## Open Questions
+
+- [OQ-003](/docs/reference/open-questions#oq-003) — closed as to *what* the names are; the follow-ups (correcting application prose, and deciding on the `app.json` identifiers) are not documentation tasks.
+- [OQ-010](/docs/reference/open-questions#oq-010) — closed. One residual: `ipacapps/ipac-documentation` is assumed, not confirmed, because the repository does not exist yet.
+- **Why did the migration happen?** Unlikely to be recoverable from artifacts. If anyone remembers, it belongs in this ADR.

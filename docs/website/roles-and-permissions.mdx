@@ -1,0 +1,176 @@
+---
+title: Roles and permissions
+sidebar_label: Roles & permissions
+description: The four independent role checks in IPAC, how they disagree, and why there is not yet a single unified role model.
+---
+
+# Roles and permissions
+
+**IPAC does not have one role model. It has four, and they disagree.**
+
+This page documents that divergence exactly as source shows it. It does not
+reconcile the four into a single table, because doing so would require choosing
+which one is right — and that choice needs the live database.
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:src/lib/access.ts',
+    'website:src/hooks/usePageAccess.ts',
+    'Mobile:app/index.tsx',
+    'Mobile:app/(admin)/_layout.tsx',
+    'Mobile:app/(packer)/_layout.tsx',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'website:src/types/supabase.ts',
+  ]}>
+  All four enforcement points were read directly in source — the divergence below
+  is **verified**, not inferred. Which role names exist in the live `roles` table
+  is **REQUIRES LIVE DATABASE VERIFICATION**; two internal documents assert a set,
+  but documents are not the database.
+</Status>
+
+## Role names referenced anywhere in source
+
+`admin` · `director` · `executive` · `sales` · `client` · `packer`
+
+`team_lead` is **not a role**. It is `order_team_members.is_team_lead`, a boolean
+scoped to one order. A packer can be team lead on one order and not on another.
+Treating it as a global role is a category error that the codebase itself warns
+about.
+
+## The four enforcement points
+
+### 1. `website` page access
+
+<SourceRef repo="website" path="src/lib/access.ts" symbol="FULL_ACCESS_ROLES" />
+
+| Role | Access |
+| --- | --- |
+| `admin`, `director`, `executive`, `sales` | All 10 admin pages |
+| `client` | `/dashboard`, `/my-orders`, `/reports` only |
+| `packer` | None — bounced to login |
+| anything else | None |
+
+The file's own comment describes `executive` as "the CEO tier (treated as full
+access)". Enforcement is a client-side `useEffect` redirect via
+`useRequirePageAccess`, and one page — `/inventory` — omits it entirely
+([H1](/docs/security/findings#h1)).
+
+### 2. `Mobile` route guards
+
+<SourceRef repo="Mobile" path="app/index.tsx" /> and the two group layouts.
+
+| Role | Destination |
+| --- | --- |
+| `admin`, `director`, `sales` | `(admin)` group |
+| `packer` | `(packer)` group |
+| anything else | redirected to `/auth/login` |
+
+### 3. `create-user` Edge Function
+
+<SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" />
+
+Permits `director` or `admin` only. Anything else receives 403.
+
+### 4. Database function `can_user_mark_attendance`
+
+<SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" />
+
+Grants when the role is `admin` or `director` **and** `profiles.status = 'active'`,
+**or** when the caller is team lead for that order. `SECURITY DEFINER`, granted to
+`authenticated` — so this one cannot be bypassed by a client.
+
+## The divergence, side by side
+
+| Role | `website` pages | `Mobile` app | Can create users | Can manage attendance |
+| --- | --- | --- | --- | --- |
+| `admin` | Full | admin group | **Yes** | **Yes** |
+| `director` | Full | admin group | **Yes** | **Yes** |
+| `executive` | **Full** | **Locked out** | No | No |
+| `sales` | **Full** | admin group | No | No |
+| `client` | 3 pages | **Locked out** | No | No |
+| `packer` | None | packer group | No | Only as team lead |
+
+Two consequences are verified from source, not speculation:
+
+:::danger `executive` cannot use Mobile at all
+
+`executive` receives full access to every page of `website`, and is not handled
+by any Mobile branch. Mobile's entry route sends unrecognised roles to
+`/auth/login`, and the admin layout renders "Access denied. Redirecting…". An
+executive user therefore cannot open the field application.
+
+This matters because `executive` is one of the role names that internal documents
+list as **live**, while `director` — which both Mobile and the Edge Function
+depend on — is **not** on that list.
+
+:::
+
+:::warning If `director` does not exist, two capabilities shrink
+
+Should live verification confirm that `director` is not a real role, then user
+creation via the Edge Function works for `admin` only, and attendance management
+reduces to `admin` plus per-order team leads. Nothing in source would fail
+loudly — the checks would simply never match.
+
+:::
+
+## The permission flags nothing reads
+
+The `roles` table carries six booleans:
+
+```text
+can_manage_roles      can_ban_users        can_block_users
+can_delete_profiles   can_reset_passwords  can_unblock_users
+```
+
+A `user_effective_permissions` view exists, as do `user_has_permission` and
+`get_user_role` functions.
+
+**No authorization decision in either application, or in the Edge Function, reads
+any of them.** Every check compares role names. The Edge Function even selects
+`can_manage_roles` alongside the role name and then ignores it.
+
+Notably, the flags describe user-management capabilities (ban, block, reset
+password, delete) that **do not correspond to the page-level access model at
+all**. There are no page-access flags in the database. So page access is purely a
+frontend concern, and the flags describe a capability model that may be enforced
+in RLS, may be half-built, or may be abandoned. Tracked as
+[OQ-016](/docs/reference/open-questions#oq-016).
+
+## Temporary privileges
+
+`temporary_privileges` holds `user_id`, `granted_role_id`, `granted_by`,
+`expires_at`, `is_active` and `reason`. A `deactivate_expired_privileges`
+function exists and **no application calls it**, which implies a trigger or
+scheduled job.
+
+Time-boxed role elevation is therefore part of the design. Its mechanism, and
+whether any of the four enforcement points above respect it, is **unverified** —
+[OQ-013](/docs/reference/open-questions#oq-013).
+
+## Rules for working with roles
+
+Until live verification lands:
+
+1. **Do not infer access from a role name.** Check all four enforcement points.
+2. **Do not add a role** without deciding its behaviour in all four.
+3. **Do not rename or remove a role.** Four hardcoded lists depend on the strings,
+   and nothing will fail at compile time.
+4. **Do not build on the permission flags.** They are inert in source.
+5. **Do not treat `team_lead` as a role.** It is per-order state.
+
+## What would resolve this
+
+One session with the live database:
+
+- `SELECT name FROM roles ORDER BY name` — the authoritative set
+- the distinct `role_id` values actually present in `profiles`
+- RLS policies referencing role names, to find a fifth enforcement point
+- grants and definition of `get_user_email_by_username`
+
+Then the divergence can be fixed properly: one shared definition of role
+capability, with the other three layers derived from it rather than restating it.
+Tracked as [OQ-002](/docs/reference/open-questions#oq-002).

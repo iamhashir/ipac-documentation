@@ -1,0 +1,100 @@
+---
+title: website setup
+sidebar_label: website setup
+description: Running the IPAC website application locally, and the checks to run before opening a pull request.
+---
+
+# website setup
+
+`website` is the faster of the two applications to get running: no native
+toolchain, no device. Start here.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:.env.example',
+    'website:docs/DEVELOPMENT.md',
+    'website:CLAUDE.md',
+  ]}>
+  Every command and variable name below was read from the repository's own
+  scripts and example environment file.
+</Status>
+
+## Run it
+
+```bash
+# 1. Clone (organisation: ipacapps)
+git clone https://github.com/ipacapps/website.git
+cd website
+
+# 2. Configure environment — see Environment variables for what each one is
+cp .env.example .env
+
+# 3. Install
+npm install
+
+# 4. Start the dev server
+npm run dev
+```
+
+The development server listens on **port 3000**:
+
+```text
+http://localhost:3000
+```
+
+Nothing meaningful will load until `.env` holds valid Supabase credentials — the
+application authenticates against the shared Supabase project on startup.
+
+## Available scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Vite dev server on port 3000 |
+| `npm run build` | Production build |
+| `npm run serve` | Preview a production build |
+| `npm run test` | Vitest, single run |
+| `npm run lint` | Biome check with `--write` — it modifies files |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm run validate` | Typecheck then build |
+
+`npm run lint` writes fixes rather than only reporting them. Expect it to change
+files, and review what it changed.
+
+## Before you open a pull request
+
+```bash
+npm run validate   # typecheck + build
+npm run test
+npm run lint
+```
+
+The repository's own guidance is to run `validate` before a deploy or pull
+request. Pull requests are also validated in CI by a GitHub Actions workflow.
+
+## Conventions worth knowing before you write code
+
+These are enforced in review, and they are documented in the application
+repository rather than here — `CLAUDE.md` and the Copilot instructions are the
+authority. In brief:
+
+- **Colours come from a semantic scale only.** Raw Tailwind palette classes are
+  disabled in the theme configuration and produce no CSS at all, so a
+  plausible-looking class name can silently do nothing.
+- **Container–presenter split.** Route containers own the data hooks; tab
+  components are pure presenters receiving data and callbacks as props.
+- **Server state lives in TanStack Query.** No manual fetching in components, no
+  copying server state into local state.
+- **Validation is Zod, applied at form level.**
+
+A deeper architectural description lives in
+[`website` architecture](/docs/guides/architecture/website-architecture).
+
+## Deployment
+
+Deployment is **not** Vercel's Git integration. A GitHub Actions workflow runs
+`vercel pull`, `vercel build --prod`, then `vercel deploy --prebuilt --prod`,
+and injects release metadata derived from the commit message. Pushing to `main`
+is what triggers a production deploy.
