@@ -290,8 +290,10 @@ Two consequences:
 - **`/inventory` calls no guard at all** — 13 sibling protected routes do, that one
   does not. Recorded as [H1](/docs/security/findings#h1).
 
-Whether the user can actually *read data* on such a page is decided by RLS, which
-**cannot be verified from source** ([OQ-008](/docs/reference/open-questions#oq-008)).
+Whether the user can actually *read data* on such a page is decided by RLS. Use
+the live baseline in
+[Live backend verification](/docs/backend/live-verification), then inspect the
+current policies for the specific tables the page reads.
 
 ### Diagnosis
 

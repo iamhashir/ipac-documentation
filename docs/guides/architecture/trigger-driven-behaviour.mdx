@@ -11,15 +11,16 @@ side effect, so the application code that issued a write does not fully describe
 what happened.
 
 <Status
-  type="partial"
-  date="2026-08-19"
-  sources={['website:docs/ARCHITECTURE.md', 'website:CLAUDE.md']}>
-  This page is **inherited**, not independently verified. The trigger locations
-  and effects below were recorded in `website/docs/ARCHITECTURE.md` on
-  2026-08-08 from the live project. They were **not re-queried** while writing
-  this site. Treat the list as a starting point for inspection, never as a
-  current inventory — see
-  [OQ-008](/docs/reference/open-questions#oq-008).
+  type="verified"
+  date="2026-08-20"
+  sources={[
+    'website:docs/ARCHITECTURE.md',
+    'website:CLAUDE.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  Trigger behaviour guidance comes from source governance and legacy docs. The
+  live trigger inventory was re-queried read-only on 2026-08-20 and is listed in
+  [Live backend verification](/docs/backend/live-verification#triggers).
 </Status>
 
 ## Why this page exists
@@ -54,14 +55,13 @@ flowchart LR
 
 ## Where triggers were recorded
 
-As of 2026-08-08, the existing document recorded live triggers on tables covering
-application settings, client reports, maintenance task assignments and logs,
-package instances, package overviews, order team members, orders, packed items,
-and profiles.
+As of the 2026-08-20 live query, enabled triggers exist on application settings,
+client reports, maintenance task assignments and logs, package instances,
+package overviews, order team members, orders, packed items, and profiles.
 
-Two things follow. First, the tables carrying triggers are exactly the ones at
-the centre of the order, packing, team and reporting workflows — that is, the
-tables you are most likely to want to change. Second, this list is weeks old.
+The tables carrying triggers are exactly the ones at the centre of the order,
+packing, team and reporting workflows — that is, the tables you are most likely
+to want to change.
 
 ## What to do about it
 
@@ -82,11 +82,10 @@ client-side and writing the result can be overwritten or can conflict.
 active order, and report numbering can all move because something else was
 written.
 
-:::note This page will be replaced by verified content
+:::note Where the full list lives
 
-A backend section describing triggers, functions, row level security and storage
-in detail is not published yet, precisely because it must be written from a live
-query rather than from restated prose. Resolving
-[OQ-008](/docs/reference/open-questions#oq-008) is the prerequisite.
+This page explains why trigger-driven behaviour matters. The current trigger
+inventory is maintained in
+[Live backend verification](/docs/backend/live-verification#triggers).
 
 :::

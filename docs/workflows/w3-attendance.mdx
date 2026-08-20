@@ -11,17 +11,18 @@ RLS policy is written down anywhere.
 
 <Status
   type="partial"
-  date="2026-08-19"
+  date="2026-08-20"
   sources={[
     'Mobile:utils/api/supabase.ts',
     'Mobile:app/(packer)/attendance.tsx',
     'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
     'website:src/components/orders/orderId/sections/AttendanceSection.tsx',
     'website:src/components/orders/orderId/modals/AttendanceCleanerModal.tsx',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  RPCs, table columns and the RLS policy are verified from source. **Whether the
-  policy in the migration is the policy that is live is unverified** — see
-  [H3](/docs/security/findings#h3).
+  RPCs, table columns and source RLS were verified from source; live policy
+  shape was checked read-only. The live `packer_sessions` policy differs from
+  the migration, but `attendance_logs` keeps the same core manage/own-read shape.
 </Status>
 
 ## The flow

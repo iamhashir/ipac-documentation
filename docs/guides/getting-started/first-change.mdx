@@ -147,7 +147,7 @@ application with no compile-time error and no test failure:
 | **Shared status values** | `production_status`/`commercial_status` are unconstrained strings; an unrecognised value passes silently |
 
 There is a further, structural reason for caution: **the database is not
-reproducible from the repositories.** One migration file covers 63+ tables, and
+reproducible from the repositories.** One migration file covers 67 live tables, and
 `website` has no migrations directory at all. There is no reviewable history and no
 reliable revert path. Read
 [Schema provenance](/docs/backend/schema-provenance) before proposing any schema
@@ -167,15 +167,17 @@ six-step change process.
 
 ## Step 5 — Check authorization and RLS impact {#step-5}
 
-:::warning This is where source-based reasoning runs out
+:::warning This is where source-based reasoning needs live data
 
-RLS policies exist in the repositories for **two** of 63+ tables. Everything else
-lives only in the live database, which this documentation has **not** queried.
+RLS policies exist in the repositories for **two** of 67 live tables. Everything
+else lives only in the live database. This documentation now includes a
+read-only live matrix, but that matrix is not a substitute for reviewing the
+specific policy bodies before changing authorization.
 
-So you can establish what the *clients* allow, and you cannot establish what the
-*database* allows. If your change depends on the latter, it needs live verification
-before merge — see [OQ-008](/docs/reference/open-questions#oq-008) and
-[OQ-014](/docs/reference/open-questions#oq-014).
+So you can establish what the *clients* allow from source, and you must establish
+what the *database* allows from Supabase. Start with
+[Live backend verification](/docs/backend/live-verification), then query the
+specific objects touched by the change.
 
 :::
 
@@ -373,20 +375,20 @@ website view.*
 
 Reading an existing column is safe. **Adding** a column is not — that is a schema
 change on a shared backend with no migration history. And if the field feeds
-reporting, check the packed-date rule first: report date semantics were changed and
-reverted, and the live logic is unknown
-([W6](/docs/workflows/w6-packing-evidence#the-report-date-rule),
-[OQ-024](/docs/reference/open-questions#oq-024)).
+reporting, check the packed-date rule first: live report semantics use
+`order_pkg_instance.packed_at` for completion modes when present
+([W6](/docs/workflows/w6-packing-evidence#the-report-date-rule)).
 
 ### HIGH — role or permission change
 
 *Example: granting a role access to a website page in
 <SourceRef repo="website" path="src/lib/access.ts" />.*
 
-**Four** places enforce authorization and they already disagree. Editing one creates
-a fifth divergence. The live role set is unconfirmed
-([OQ-002](/docs/reference/open-questions#oq-002)), and RLS — the layer that actually
-protects data — cannot be checked from source. Requires review, not just validation.
+**Four** places enforce authorization and they already disagree. Editing one
+creates a fifth divergence. The live role set is known, and it confirms the
+source mismatch: `director` is checked in code but is not a live role row. RLS is
+the layer that actually protects data, so role changes require policy review, not
+just validation.
 
 ### HIGH — shared workflow change
 
@@ -394,9 +396,8 @@ protects data — cannot be checked from source. Requires review, not just valid
 
 `Mobile` writes `attendance_logs`; `website` reads and remediates it. A
 `SECURITY DEFINER` database function grants attendance rights based on per-order
-team-lead status. One of the two RLS policies that exist in source is predicated on a
-column that **does not exist**
-([OQ-014](/docs/reference/open-questions#oq-014)). Read
+team-lead status. The source `packer_sessions` policy is stale and differs from
+production. Read
 [W2](/docs/workflows/w2-packer-team-assignment) and
 [W3](/docs/workflows/w3-attendance) before touching this.
 

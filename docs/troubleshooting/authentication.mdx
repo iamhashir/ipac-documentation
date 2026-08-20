@@ -208,9 +208,9 @@ permission/policy problem on `profiles`.
    profile or `Error loading user profile:` with details.
 3. Run the built-in connectivity check — see
    [Configuration C2](./configuration#c2) — which reads `profiles` directly.
-4. If the read errors rather than hangs, the cause is likely RLS on `profiles`,
-   **which cannot be confirmed from source**
-   ([OQ-008](/docs/reference/open-questions#oq-008)).
+4. If the read errors rather than hangs, the cause is likely RLS on `profiles`.
+   Use [Live backend verification](/docs/backend/live-verification) as the
+   baseline, then inspect the current `profiles` policies.
 
 ### Resolution
 

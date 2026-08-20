@@ -10,19 +10,19 @@ The workflow with the most business consequence, the only documented business
 rule with a stated rationale, and one verified defect.
 
 <Status
-  type="partial"
-  date="2026-08-19"
+  type="verified"
+  date="2026-08-20"
   sources={[
     'Mobile:utils/api/supabase.ts',
     'website:Trail/packed-date-report-conflict-log.md',
     'website:inspect_rpc.js',
     'website:inspect_instances.js',
     'website:src/features/reports/',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  The bucket mismatch, the RPC signature and the instance columns are **verified**.
-  The report-date rule is verified **as authored intent** from an incident log —
-  but that log records the change being **reverted**, so **which logic is live
-  today requires live verification**.
+  The bucket mismatch, RPC signature, instance columns, storage bucket state and
+  live report-date logic are verified. The live function uses
+  `order_pkg_instance.packed_at` as the completion-date source when present.
 </Status>
 
 ## The flow
@@ -61,7 +61,7 @@ comes with its reason.
 COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))
 ```
 
-**Previously, and after the revert:**
+**Previously, and after the 2026-08-08 revert:**
 
 ```sql
 MAX(pkd_item.created_at)
@@ -105,18 +105,13 @@ For one client order filtered to one destination and a two-week window:
 A date-logic change doubled a client-facing report. This is why the rule matters
 and why the reasoning must stay written down.
 
-:::warning Which logic is live is unverified
+:::info Live logic as of 2026-08-20
 
-The log states that both the data backfill and the RPC change were **reverted on
-2026-08-08**, restoring `MAX(pkd_item.created_at)`. A further migration named
-`add_packing_start_completion_date_modes` exists as an **uncommitted** file in an
-older checkout, suggesting additional date modes were explored after that.
-
-**Do not rely on either formula being current.** Verify against the live function
-before changing report behaviour. The full history, including client code committed
-*after* the revert, is recorded in
-[ADR-0003](/docs/adr/adr-0003-report-packed-date) —
-[OQ-024](/docs/reference/open-questions#oq-024).
+The live `fetch_report_instances` overload with `p_tag_ids` uses
+`COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` for
+completion-style date modes. `item_packed_at` is a legacy alias for completion,
+`packing_completed_at` is the explicit completion mode, and
+`packing_started_at` uses the first packed item timestamp.
 
 :::
 
@@ -129,8 +124,8 @@ fetch_report_instances(p_client_id, p_order_ids, p_date_from, p_date_to,
                        p_date_mode, p_destinations, p_has_items_only, p_tag_ids)
 ```
 
-`p_date_mode` accepts at least `item_packed_at`. The full set of modes is
-unverified.
+The live function accepts `packing_started_at`, `packing_completed_at`,
+`item_packed_at`, and falls back to instance creation for unrecognised modes.
 
 ## The storage bucket mismatch
 
@@ -144,26 +139,21 @@ flowchart LR
   M --> T
 ```
 
-:::danger Two buckets, one workflow
+:::danger Storage mismatch
 
 `Mobile` uploads package photographs to **`order_media`**, then derives a public
 URL. `website` reads and writes **`media`** in six places. Only `media` appears in
-the schema snapshot.
+the stale schema snapshot, and live Supabase has no `order_media` bucket.
 
-Consequences, if `order_media` is genuinely separate:
-
-- photographs taken in the field may not appear in client reports
-- `getPublicUrl` on a public bucket makes client cargo imagery readable by anyone
-  holding the URL
-
-**Verify both buckets before documenting this workflow as working** —
-[OQ-015](/docs/reference/open-questions#oq-015) and
+Consequence: photographs taken in the field through this path may not upload or
+may not appear in client reports. The live `media` bucket is public, so any fix
+needs a deliberate storage-access decision rather than a silent bucket swap. See
 [H2](/docs/security/findings#h2).
 
 :::
 
-Note that Mobile also writes an `order_media` **table**, distinct from `website`'s
-`media` table. Neither appears in the other application's code.
+Note that Mobile also writes an `order_media` **table** in source, but no live
+public table by that name was found.
 
 ## Manual remediation happens
 

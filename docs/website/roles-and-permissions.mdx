@@ -8,13 +8,13 @@ description: The four independent role checks in IPAC, how they disagree, and wh
 
 **IPAC does not have one role model. It has four, and they disagree.**
 
-This page documents that divergence exactly as source shows it. It does not
-reconcile the four into a single table, because doing so would require choosing
-which one is right — and that choice needs the live database.
+This page documents that divergence exactly as source and live database state
+show it. It does not reconcile the four into a single table, because doing so is
+a product and authorization-design decision.
 
 <Status
   type="partial"
-  date="2026-08-19"
+  date="2026-08-20"
   sources={[
     'website:src/lib/access.ts',
     'website:src/hooks/usePageAccess.ts',
@@ -24,16 +24,18 @@ which one is right — and that choice needs the live database.
     'Mobile:supabase/functions/create-user/index.ts',
     'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
     'website:src/types/supabase.ts',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
   All four enforcement points were read directly in source — the divergence below
-  is **verified**, not inferred. Which role names exist in the live `roles` table
-  is **REQUIRES LIVE DATABASE VERIFICATION**; two internal documents assert a set,
-  but documents are not the database.
+  is **verified**, not inferred. Live role rows were checked on 2026-08-20.
 </Status>
 
 ## Role names referenced anywhere in source
 
 `admin` · `director` · `executive` · `sales` · `client` · `packer`
+
+Live `roles.name` rows are `admin`, `client`, `executive`, `packer`, and
+`sales`. There is no live `director` row today, even though source checks for it.
 
 `team_lead` is **not a role**. It is `order_team_members.is_team_lead`, a boolean
 scoped to one order. A packer can be team lead on one order and not on another.
@@ -108,16 +110,16 @@ depend on — is **not** on that list.
 
 :::
 
-:::warning If `director` does not exist, two capabilities shrink
+:::warning `director` does not exist live
 
-Should live verification confirm that `director` is not a real role, then user
-creation via the Edge Function works for `admin` only, and attendance management
-reduces to `admin` plus per-order team leads. Nothing in source would fail
-loudly — the checks would simply never match.
+Live verification confirmed no `director` role row. User creation via the Edge
+Function therefore works for `admin` only, and attendance management reduces to
+`admin` plus per-order team leads. Nothing in source fails loudly — the checks
+simply never match.
 
 :::
 
-## The permission flags nothing reads
+## Permission flags are database-side only
 
 The `roles` table carries six booleans:
 
@@ -133,12 +135,10 @@ A `user_effective_permissions` view exists, as do `user_has_permission` and
 any of them.** Every check compares role names. The Edge Function even selects
 `can_manage_roles` alongside the role name and then ignores it.
 
-Notably, the flags describe user-management capabilities (ban, block, reset
-password, delete) that **do not correspond to the page-level access model at
-all**. There are no page-access flags in the database. So page access is purely a
-frontend concern, and the flags describe a capability model that may be enforced
-in RLS, may be half-built, or may be abandoned. Tracked as
-[OQ-016](/docs/reference/open-questions#oq-016).
+Live RLS does enforce some flags through `user_has_permission`, so the flags are
+not inert. They still do **not** correspond to the page-level access model.
+There are no page-access flags in the database, so page access is purely a
+frontend concern.
 
 ## Temporary privileges
 
@@ -147,30 +147,22 @@ in RLS, may be half-built, or may be abandoned. Tracked as
 function exists and **no application calls it**, which implies a trigger or
 scheduled job.
 
-Time-boxed role elevation is therefore part of the design. Its mechanism, and
-whether any of the four enforcement points above respect it, is **unverified** —
-[OQ-013](/docs/reference/open-questions#oq-013).
+Time-boxed role elevation is therefore part of the database authorization design.
+Live verification found zero temporary privilege rows on 2026-08-20.
 
 ## Rules for working with roles
 
-Until live verification lands:
+Until the role model is unified:
 
 1. **Do not infer access from a role name.** Check all four enforcement points.
 2. **Do not add a role** without deciding its behaviour in all four.
 3. **Do not rename or remove a role.** Four hardcoded lists depend on the strings,
    and nothing will fail at compile time.
-4. **Do not build on the permission flags.** They are inert in source.
+4. **Do not use permission flags for page access** until the frontend model is designed.
 5. **Do not treat `team_lead` as a role.** It is per-order state.
 
 ## What would resolve this
 
-One session with the live database:
-
-- `SELECT name FROM roles ORDER BY name` — the authoritative set
-- the distinct `role_id` values actually present in `profiles`
-- RLS policies referencing role names, to find a fifth enforcement point
-- grants and definition of `get_user_email_by_username`
-
-Then the divergence can be fixed properly: one shared definition of role
-capability, with the other three layers derived from it rather than restating it.
-Tracked as [OQ-002](/docs/reference/open-questions#oq-002).
+The live role set is now known. What remains is a design decision: one shared
+definition of role capability, with the other layers derived from it rather than
+restating it.

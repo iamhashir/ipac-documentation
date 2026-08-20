@@ -11,18 +11,19 @@ consequential fact about IPAC's architecture, and most of the system's risk
 follows from it.
 
 <Status
-  type="partial"
-  date="2026-08-19"
+  type="verified"
+  date="2026-08-20"
   sources={[
     'website:src/lib/supabase.ts',
     'Mobile:utils/api/',
     'Mobile:app.json',
     'website:docs/ARCHITECTURE.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
   The shared-project relationship was confirmed from both applications' Supabase
-  client configuration. Statements about specific backend objects are inherited
-  from `website/docs/ARCHITECTURE.md` — see
-  [OQ-008](/docs/reference/open-questions#oq-008).
+  client configuration. Specific live backend object counts and policy summaries
+  were verified read-only on 2026-08-20; see
+  [Live backend verification](/docs/backend/live-verification).
 </Status>
 
 ## What is shared
@@ -63,10 +64,10 @@ an edge function using a service-role key, because a service-role key bypasses
 row level security entirely and must never be shipped to a client. Any new
 privileged workflow belongs in that same server-side category.
 
-**Schema history is split across two repositories.** Both `website` and
-`Mobile` contain migration directories. Neither is a complete record
-on its own, so reading one and assuming you have seen the schema's history is a
-mistake.
+**Schema history is not versioned in one complete place.** `Mobile` contains one
+migration file and `website` has no `supabase/` directory. Neither repository is
+a complete record, so reading one and assuming you have seen the schema's history
+is a mistake.
 
 ## Rules that follow
 

@@ -6,14 +6,13 @@ description: The open security findings from the 2026-08-19 source audit of Mobi
 
 # Security findings
 
-Findings from a **source-only** audit on 2026-08-19. No penetration testing, no
-live database inspection, no runtime analysis. Several findings therefore state a
-verified *pattern* whose real-world impact depends on RLS or storage
-configuration that only a live check can confirm.
+Findings from a source audit on 2026-08-19, updated with read-only live Supabase
+catalog verification on 2026-08-20. No penetration testing or runtime analysis
+was performed.
 
 <Status
   type="partial"
-  date="2026-08-19"
+  date="2026-08-20"
   sources={[
     'website:src/routes/',
     'website:src/middleware/auth.ts',
@@ -23,9 +22,10 @@ configuration that only a live check can confirm.
     'Mobile:supabase/functions/create-user/index.ts',
     'Mobile:Trail/login-hashir-1.md',
     'website:Trail/packed-date-report-conflict-log.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  Every finding cites a file that was read directly. Where impact depends on the
-  live database, that is stated in the finding rather than assumed either way.
+  Every finding cites a file that was read directly. Supabase-dependent findings
+  were updated after read-only live catalog verification on 2026-08-20.
   **No secret values appear on this page or anywhere on this site.**
 </Status>
 
@@ -46,12 +46,12 @@ to check first.
 | Repository | `website` |
 | File | <SourceRef repo="website" path="src/routes/inventory.tsx" /> |
 | Evidence | The route is listed in `ADMIN_PAGES` in `src/lib/access.ts` but does not call `useRequirePageAccess`. All 13 sibling protected pages do. |
-| Confidence | **VERIFIED** as a gap. Data exposure: **REQUIRES LIVE DATABASE VERIFICATION** |
+| Confidence | **VERIFIED** as a route-guard gap. Data exposure depends on live RLS. |
 
 A signed-in `client`- or `packer`-role user navigating directly to `/inventory`
 renders the full 2,765-line inventory module, including supplier and pricing
-views. What they can actually *see* is decided by RLS on `materials`,
-`material_variants`, `suppliers` and `supplier_pricing` — which is unverified.
+views. What they can actually *see* is decided by live RLS on `materials`,
+`material_variants`, `suppliers` and `supplier_pricing`.
 
 **Fix:** add `useRequirePageAccess()` to the route. One line, and it makes the
 page consistent with every sibling. It does not remove the need for RLS.
@@ -63,16 +63,16 @@ page consistent with every sibling. It does not remove the need for RLS.
 | Repository | `Mobile` |
 | File | <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="order media upload" /> |
 | Evidence | `storage.from('order_media').upload(...)` immediately followed by `storage.from('order_media').getPublicUrl(filename)`. Filenames are `orderPackageId/timestamp.ext`. |
-| Confidence | **VERIFIED** as a pattern. Bucket visibility: **REQUIRES LIVE DATABASE VERIFICATION** |
+| Confidence | **VERIFIED** as a code/live-storage mismatch. |
 
-`getPublicUrl` only returns a working URL for a public bucket. If `order_media`
-is public, client cargo photographs are readable by anyone with the URL, and the
-URL is guessable in structure. `website` uses a different bucket (`media`)
-entirely, and only `media` appears in the schema snapshot.
+`getPublicUrl` only returns a working URL for a public bucket. Live verification
+on 2026-08-20 found **no `order_media` bucket**. The likely failure mode is
+broken Mobile photo upload/retrieval rather than public exposure through that
+bucket. `website` uses a different live bucket, `media`, which is public.
 
-**Check first:** does `order_media` exist, and is it public? If public and
-containing client imagery, this becomes CRITICAL. Use signed URLs instead.
-Tracked as [OQ-015](/docs/reference/open-questions#oq-015).
+**Fix:** align Mobile with the live storage model, or create a deliberately
+private replacement bucket with signed URLs. Creating/changing buckets is a
+production change and requires explicit approval.
 
 ### H3 — A written RLS policy is predicated on a non-existent column {#h3}
 
@@ -81,16 +81,15 @@ Tracked as [OQ-015](/docs/reference/open-questions#oq-015).
 | Repository | `Mobile` |
 | File | <SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" /> |
 | Evidence | The `packer_sessions` manage policy requires `orders.status IN ('pending','in_progress')`. `orders` has `production_status` and `commercial_status`, no `status`. No application code reads `orders.status`. |
-| Confidence | **VERIFIED** as an inconsistency. Live state: **REQUIRES LIVE DATABASE VERIFICATION** |
+| Confidence | **VERIFIED** as source/live drift. |
 
-The migration drops three pre-existing policies before creating the new ones. If
-the `CREATE` failed, `packer_sessions` is left with RLS enabled and **no manage
-policy**, which fails closed — annoying but safe. If it somehow succeeded against
-a column that has since been removed, the live policy differs from the file, and
-nobody knows what it says.
+Live verification on 2026-08-20 shows the production policy differs from the
+file: it uses `orders.production_status IN ('pending','in_progress')`. The
+non-existent-column bug is not live today.
 
-**Check first:** dump the live policies on `packer_sessions`.
-[OQ-014](/docs/reference/open-questions#oq-014).
+The remaining risk is different: `packer_sessions` also has a policy named
+`Temporary all authenticated access` that allows any authenticated user through
+`auth.uid() IS NOT NULL`. Review whether that temporary policy is still intended.
 
 ### H4 — Authorization is duplicated across four layers with different role sets {#h4}
 
@@ -145,12 +144,10 @@ made and nobody could later prove what changed or revert it reliably.
 ### M1 — Username-to-email disclosure {#m1}
 
 `get_user_email_by_username` returns an email for a username and is called
-**before** authentication. Mobile's comment confirms it runs with elevated
-privileges. If it is granted to `anon`, it is an unauthenticated
-username-to-email enumeration oracle; if granted only to `authenticated`, the
-username login flow could not work pre-session — which suggests `anon` access.
-**Requires live verification of grants.** Mitigation: rate limiting, or accept
-the trade-off knowingly.
+**before** authentication. Live verification confirms it is `SECURITY DEFINER`
+and executable by `anon` and `authenticated`. This is an unauthenticated
+username-to-email enumeration oracle unless rate-limited or otherwise monitored.
+Mitigation: rate limiting, or accept the trade-off knowingly.
 
 ### M2 — Backend config is committed and logged {#m2}
 
@@ -236,11 +233,9 @@ Worth recording so a refactor does not remove it:
 
 ## Verification queue
 
-In priority order, because two HIGH findings hinge on them:
+Remaining queue:
 
-1. Is bucket `order_media` present and public? (H2)
-2. What are the live policies on `packer_sessions`? (H3)
-3. What are the live `roles.name` values? (H4)
-4. Who may execute `get_user_email_by_username`? (M1)
-5. Is RLS enabled, with policies, on all tables — starting with the 26 shared ones?
-6. Is phone auth enabled in the project? (M6)
+1. Is phone auth enabled in the project? (M6)
+2. Is `audit_log` complete for user creation? (H5)
+3. Are all `SECURITY DEFINER` grants to `anon` intentional?
+4. Should the temporary broad `packer_sessions` policy be removed?

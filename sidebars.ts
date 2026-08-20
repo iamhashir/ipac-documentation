@@ -67,7 +67,7 @@ const sidebars: SidebarsConfig = {
     },
   ],
 
-  backend: ['backend/database-model', 'backend/schema-provenance'],
+  backend: ['backend/database-model', 'backend/live-verification', 'backend/schema-provenance'],
 
   security: ['security/model', 'security/findings'],
 

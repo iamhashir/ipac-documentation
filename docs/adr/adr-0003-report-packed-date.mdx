@@ -1,33 +1,32 @@
 ---
 title: ADR-0003 — Report packed-date semantics
 sidebar_label: ADR-0003 · Report packed date
-description: The packed-date rule for client reports, its stated rationale, the production change that was applied and reverted, and why the current live behaviour cannot be confirmed.
+description: The packed-date rule for client reports, its stated rationale, the production change that was applied and reverted, and the current live behaviour.
 ---
 
 # ADR-0003 — Report packed-date semantics
 
 ```text
-Status:              Historical / Current state unresolved
+Status:              Accepted
 Date:                2026-08-08 applied and reverted · 2026-08-11 client behaviour committed
 Decision owners:     Not recorded
-Evidence confidence: HIGH historically · PARTIAL currently · server side UNVERIFIED
+Evidence confidence: HIGH historically · VERIFIED live 2026-08-20
 ```
 
 <Status
-  type="partial"
-  date="2026-08-19"
+  type="verified"
+  date="2026-08-20"
   sources={[
     'website:Trail/packed-date-report-conflict-log.md',
     'website:Trail/box-snapshots-2026-08-10.json',
     'website:src/features/reports/components/PackingListPage.tsx',
     'website:src/features/reports/types.ts',
     'website:inspect_rpc.js',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  This ADR is deliberately split three ways. The history is documented in detail by an
-  incident log. The **client** behaviour is verified from committed code. The
-  **server** behaviour — which SQL is live in `fetch_report_instances` today —
-  **cannot be established from source** and must not be assumed. See
-  [OQ-024](/docs/reference/open-questions#oq-024).
+  The history is documented in detail by an incident log. The client behaviour is
+  verified from committed code, and the server behaviour was verified from the
+  live `fetch_report_instances` function body on 2026-08-20.
 </Status>
 
 ## Context
@@ -154,22 +153,21 @@ first-packed trigger — **Not recorded.**
   See [Schema provenance](/docs/backend/schema-provenance).
 - **Production data was edited to investigate a reporting question**, with a
   hand-rolled JSON backup rather than a reversible migration.
-- **The end state is ambiguous** — see Current State.
+- **The end state was ambiguous until live verification on 2026-08-20.**
 
 ### Risks
 
 - **A client-visible number can change by 2× from one `COALESCE`.** Any future change
   here needs a before/after count on real data, exactly as this investigation did.
-- **Client and server may now disagree.** If the RPC is still `MAX`-only while the
-  client preserves `packed_at`, the client is maintaining a field the report ignores —
-  and a code comment says otherwise.
+- **Client and server can drift again.** The current live RPC and client agree,
+  but the function body is not versioned in a repository migration.
 - **`packed_at` is only ever set by the website packing list page.** No trigger is
   evidenced. Boxes packed through any other path may have `packed_at` null
   indefinitely and fall back to item timestamps.
 
 ## Current State
 
-This is the part that must not be overstated.
+Live server and current client now agree on the completion-date rule.
 
 ### CURRENTLY VERIFIED — the client
 
@@ -202,31 +200,15 @@ fetch_report_instances(p_client_id, p_order_ids, p_date_from, p_date_to,
                        p_date_mode, p_destinations, p_has_items_only, p_tag_ids)
 ```
 
-`p_date_mode` accepts at least `item_packed_at`.
+`p_date_mode` accepts `packing_started_at`, `packing_completed_at`,
+`item_packed_at`, and falls back to instance creation for unrecognised modes.
+`item_packed_at` is a legacy alias for completion.
 
-### REQUIRES LIVE DATABASE VERIFICATION — the server
+### CURRENTLY VERIFIED — the server
 
-:::danger Do not claim which SQL is live
-
-The incident log states the RPC was reverted to `MAX(pkd_item.created_at)` on
-2026-08-08. Three days later, commit `04fcc93` shipped client code whose comments
-assert that the RPC prefers `order_pkg_instance.packed_at`.
-
-Both readings are consistent with the evidence, and **source cannot distinguish
-them**:
-
-| Reading | Implication |
-| --- | --- |
-| The migration was re-applied after 2026-08-08 | The `COALESCE` logic is live and the client comments are accurate |
-| The revert stands | The client preserves a `packed_at` the report **ignores**, and two code comments are wrong |
-
-Under the second reading, a box reopened and repacked keeps its original `packed_at`
-while the report still moves its date — the exact defect this work set out to fix.
-
-**Verify the live function body before changing anything here.**
-[OQ-024](/docs/reference/open-questions#oq-024).
-
-:::
+The live `fetch_report_instances` overload with `p_tag_ids` uses
+`COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` for
+completion-style date modes. `packing_started_at` uses `MIN(pkd_item.created_at)`.
 
 One further unresolved thread: a migration file named
 `add_packing_start_completion_date_modes` exists as an **uncommitted** file in a
@@ -246,11 +228,11 @@ this episode. Whether it was ever applied is unknown.
 | Everything reverted on 2026-08-08 | Trail log, with post-revert verification | HISTORICALLY VERIFIED |
 | Client write-once behaviour is live | commit `04fcc93`, present at HEAD | **CURRENTLY VERIFIED** |
 | Client comments assert the RPC prefers `packed_at` | `types.ts`, `PackingListPage.tsx` | **CURRENTLY VERIFIED** as a claim in code |
-| RPC signature and `item_packed_at` mode | `inspect_rpc.js` | CURRENTLY VERIFIED |
-| Which SQL is live in `fetch_report_instances` | — | **REQUIRES LIVE DATABASE VERIFICATION** |
-| Whether the migration still exists in the project | — | **REQUIRES LIVE DATABASE VERIFICATION** |
-| Full set of `p_date_mode` values | — | **REQUIRES LIVE DATABASE VERIFICATION** |
-| Whether `add_packing_start_completion_date_modes` was applied | — | **REQUIRES LIVE DATABASE VERIFICATION** |
+| RPC signature and `item_packed_at` mode | `inspect_rpc.js`, live Supabase | CURRENTLY VERIFIED |
+| Which SQL is live in `fetch_report_instances` | live Supabase | CURRENTLY VERIFIED |
+| Whether the migration still exists in the project | — | Not recorded in repository history |
+| Full set of `p_date_mode` values | live Supabase | CURRENTLY VERIFIED |
+| Whether `add_packing_start_completion_date_modes` was applied | live function shape, absent repo history | Function shape appears applied; migration file remains unversioned |
 | Who decided | — | **Not recorded** |
 | Whether the client change was intended to accompany a re-applied migration | — | **Not recorded** |
 
@@ -261,8 +243,7 @@ this episode. Whether it was ever applied is unknown.
 - [Schema provenance](/docs/backend/schema-provenance) — why the migration is not in any repository
 - [Your first change](/docs/guides/getting-started/first-change) — the MEDIUM-risk example points here
 
-## Open Questions
+## Remaining Questions
 
-- [OQ-024](/docs/reference/open-questions#oq-024) — **which report packed-date logic is live today.** The blocking question for this ADR; resolving it turns the status from Unresolved to Accepted or Superseded.
 - [OQ-011](/docs/reference/open-questions#oq-011) — where migrations should live. This episode is the strongest argument for versioning them.
 - **Is `packed_at` ever set outside the website packing list page?** No trigger is evidenced. If not, boxes packed by any other route keep a null `packed_at` and silently fall back to item timestamps.

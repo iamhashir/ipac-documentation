@@ -14,14 +14,16 @@ This page states exactly what those echoes are and how far each can be trusted.
 
 <Status
   type="verified"
-  date="2026-08-19"
+  date="2026-08-20"
   sources={[
     'website:src/types/supabase.ts',
     'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
     'website:Trail/packed-date-report-conflict-log.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  Every claim on this page is about the contents of the repositories, which were
-  read directly. It makes no claim about the current state of the database.
+  Repository artifacts were read directly and compared with read-only live
+  Supabase catalog results. Current live counts and policy summaries are kept in
+  [Live backend verification](./live-verification).
 </Status>
 
 ## The three sources, ranked
@@ -33,8 +35,9 @@ Supabase types file of 4,218 lines. It is the single most informative schema
 artifact in either repository, declaring **63 tables, 3 views, 49 functions,
 8 enums and 188 foreign keys** with exact column types and nullability.
 
-**It is provably out of date.** Application code references database objects
-that the file does not declare:
+**It is provably out of date.** Live Supabase now reports 67 public tables, 83
+public functions and 11 enums. Application code references database objects that
+the file does not declare:
 
 | Missing from the types file | Used by |
 | --- | --- |
@@ -42,9 +45,11 @@ that the file does not declare:
 | `order_media` | `Mobile` |
 | `add_order_item_allocation`, `apply_order_item_allocations`, `upsert_order_item_allocation`, `set_allocation_expected`, `approve_allocation_increase_request`, `reject_allocation_increase_request`, `fetch_report_instances`, `fetch_instance_items` | `website` |
 
-The entire allocation subsystem post-dates the snapshot. So does the reporting
-RPC that `website` depends on. The file carries no generation date, and nothing
-in either repository records when it was produced or by whom.
+The allocation subsystem post-dates the snapshot and is live, except for
+`order_media`, which was not found as a live table or storage bucket. The
+reporting RPC that `website` depends on has live overloads absent from the
+snapshot. The file carries no generation date, and nothing in either repository
+records when it was produced or by whom.
 
 **How to treat it:** as a lower bound on what exists, never as a description of
 what exists now. A table in the file almost certainly exists; a table absent
@@ -80,7 +85,7 @@ This is the central fact, and it is not a suspicion — it is documented.
 
 Consequences, stated plainly:
 
-- **There is no reviewable history.** 63+ tables and 49+ functions have one
+- **There is no reviewable history.** 67 tables and 83 functions have one
   migration between them. You cannot diff a schema change, and you cannot see
   who changed what when.
 - **There is no revert path.** Reverting the change above meant manually
@@ -124,5 +129,4 @@ without it. The minimum viable change:
 
 Until at least steps 1 and 4 happen, every backend page here has a shelf life
 measured in weeks. Tracked as
-[OQ-011](/docs/reference/open-questions#oq-011) and
-[OQ-008](/docs/reference/open-questions#oq-008).
+[OQ-011](/docs/reference/open-questions#oq-011).

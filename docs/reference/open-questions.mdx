@@ -20,35 +20,35 @@ entries that have since been answered from source.
 
 | ID | Question | Impact |
 | --- | --- | --- |
-| [OQ-002](#oq-002) | What is the live role set, and is there a hierarchy? | High |
 | [OQ-004](#oq-004) | Is the `.docs/` reference set and worklog protocol still in force? | Medium |
 | [OQ-006](#oq-006) | Which Node version is officially supported? | Medium |
-| [OQ-008](#oq-008) | What is the current live schema shape? | High |
 | [OQ-009](#oq-009) | Who may access this documentation site, and on what domain? | Medium |
 | [OQ-011](#oq-011) | Where should database migrations live, and how do we baseline? | High |
 | [OQ-012](#oq-012) | What are the legal order status values and transitions? | High |
 | [OQ-013](#oq-013) | What are the 24 uncalled database functions for? | Medium |
-| [OQ-014](#oq-014) | What are the live RLS policies on `packer_sessions`? | High |
-| [OQ-015](#oq-015) | Does bucket `order_media` exist, and is it public? | High |
-| [OQ-016](#oq-016) | Are the `roles` permission flags enforced anywhere? | Medium |
 | [OQ-017](#oq-017) | Is phone/SMS authentication enabled in the project? | Medium |
 | [OQ-018](#oq-018) | What is the actual Mobile release and distribution process? | Medium |
 | [OQ-019](#oq-019) | Is `audit_log` a complete record of user creation? | Medium |
-| [OQ-020](#oq-020) | How is "one active order per packer" enforced? | Medium |
 | [OQ-021](#oq-021) | Which attendance capability function is authoritative? | Medium |
 | [OQ-022](#oq-022) | What is the difference between `unpause_task` and `resume_task`? | Low |
 | [OQ-023](#oq-023) | What keeps `packer_sessions` denormalised fields fresh? | Low |
-| [OQ-024](#oq-024) | Which report packed-date logic is live today? | High |
 
 ## Closed register
 
 | ID | Question | Closed |
 | --- | --- | --- |
 | [OQ-001](#oq-001) | Which mobile repository is canonical? | 2026-08-19 |
+| [OQ-002](#oq-002) | What is the live role set, and is there a hierarchy? | 2026-08-20 |
 | [OQ-003](#oq-003) | Which names do the application repositories still use? | 2026-08-19 |
 | [OQ-005](#oq-005) | Which website features are actually unbuilt? | superseded |
 | [OQ-007](#oq-007) | `order_teams` or `order_team_members`? | 2026-08-19 |
+| [OQ-008](#oq-008) | What is the current live schema shape? | 2026-08-20 |
 | [OQ-010](#oq-010) | Which organisation owns the repositories? | 2026-08-19 |
+| [OQ-014](#oq-014) | What are the live RLS policies on `packer_sessions`? | 2026-08-20 |
+| [OQ-015](#oq-015) | Does bucket `order_media` exist, and is it public? | 2026-08-20 |
+| [OQ-016](#oq-016) | Are the `roles` permission flags enforced anywhere? | 2026-08-20 |
+| [OQ-020](#oq-020) | How is "one active order per packer" enforced? | 2026-08-20 |
+| [OQ-024](#oq-024) | Which report packed-date logic is live today? | 2026-08-20 |
 
 ---
 
@@ -56,7 +56,7 @@ entries that have since been answered from source.
 
 ### What is the live role set, and is there a hierarchy?
 
-**Impact: High. Status: open.**
+**Impact: High. Status: closed 2026-08-20.**
 
 **What was observed.** Source references six role names: `admin`, `director`,
 `executive`, `sales`, `client`, `packer`. Four enforcement points use **different
@@ -67,17 +67,17 @@ documents — `website/docs/ROLES.md` and `website/AGENTS.md` — assert that th
 `director`, `project_lead`, `team_lead` and `customer` are code-only. `AGENTS.md`
 explicitly warns against reconciling the layers without verifying all of them.
 
-**Why it is still unresolved.** Two documents agreeing is not a query. Per this
-site's own rule, the live database state is never inferred from documentation.
+**Resolved from live Supabase.** `roles.name` rows are `admin`, `client`,
+`executive`, `packer`, and `sales`. They are used by 35 profiles: 4 admin,
+4 client, 1 executive, 25 packer, and 1 sales.
 
 **Why it matters.** If `director` does not exist live, then user creation via the
 Edge Function works for `admin` only, and attendance management reduces to `admin`
 plus per-order team leads — with nothing failing loudly. Meanwhile `executive`,
 which the documents call live, is locked out of Mobile entirely.
 
-**What would resolve it.** `SELECT name FROM roles`; the distinct `role_id` values
-present in `profiles`; and a scan of RLS policies for role-name references, which
-may reveal a fifth enforcement point.
+**Residual.** There is no live hierarchy object. Any hierarchy remains a product
+or code convention, not a database primitive.
 
 ---
 
@@ -129,7 +129,9 @@ worth adopting; see
 | `website/.github/workflows/ci-cd.yml` | **24.x** |
 
 `website` therefore validates pull requests on one major and builds production on
-another — a change can pass review and fail in production.
+another — a change can pass review and fail in production. The documentation
+repository pins 22.19.0 locally, but the Vercel `ipac-documentation` project is
+currently configured for Node 24.x.
 
 **What remains.** Choosing one version per application. That is a decision, not a
 lookup. This documentation site pins 22.19.0, matching `Mobile`.
@@ -140,23 +142,17 @@ lookup. This documentation site pins 22.19.0, matching `Mobile`.
 
 ### What is the current live schema shape?
 
-**Impact: High. Status: open.**
+**Impact: High. Status: closed 2026-08-20.**
 
-**Partially resolved from source.** `website/src/types/supabase.ts` declares
-**63 tables, 3 views, 49 functions, 8 enums, 188 foreign keys** — now documented at
-[Database model](/docs/backend/database-model).
+**Resolved from live Supabase.** The live project has 67 public tables, 3 views,
+83 public functions, 11 public enums and 17 non-internal triggers. Every live
+public table has RLS enabled. The shared-table RLS matrix, storage buckets,
+triggers and high-signal grants are documented in
+[Live backend verification](/docs/backend/live-verification).
 
-**Why it is still unresolved.** The snapshot is **provably stale**: code references
-5 tables and 8 functions it does not declare. It carries no generation date. An
-older internal document recorded 67 tables. See
-[Schema provenance](/docs/backend/schema-provenance).
-
-**Still unavailable from any repository:** the trigger inventory, RLS coverage
-beyond two tables, which functions are `SECURITY DEFINER`, storage bucket
-configuration, and function grants.
-
-**What would resolve it.** Regenerate the types file and record the date; dump
-triggers, policies, grants and bucket configuration.
+**Residual.** Fresh generated TypeScript types still need to be produced and
+compared in a temporary location before deciding whether to overwrite application
+types.
 
 ---
 
@@ -167,12 +163,16 @@ triggers, policies, grants and bucket configuration.
 **Impact: Medium. Status: open.**
 
 The site is configured to be compatible with Vercel Deployment Protection —
-crawling disallowed in `static/robots.txt`, sitemap generation off. **Not decided:**
-which people or identity provider gain access, and the final hostname. `url` in
-`docusaurus.config.ts` holds a placeholder.
+crawling disallowed in `static/robots.txt`, sitemap generation off. Live Vercel
+inspection on 2026-08-20 confirmed SSO protection for all deployments except
+custom domains, zero aliases, zero team domains, and no environment variables.
 
-**What would resolve it.** Choose the protection mode and audience, enable it in
-the Vercel project, confirm the domain, then update `url`.
+**Not decided:** which people or identity provider groups should be allowed, and
+whether the placeholder `url` in `docusaurus.config.ts` should remain
+`https://ipac-documentation.vercel.app` when no public alias is permitted.
+
+**What would resolve it.** Choose the access audience and final absolute URL
+strategy, then update `url` if needed.
 
 ---
 
@@ -180,7 +180,7 @@ the Vercel project, confirm the domain, then update `url`.
 
 ### Where should database migrations live, and how do we baseline?
 
-**Impact: High. Status: open.**
+**Impact: High. Status: open — live values resolved, transitions pending.**
 
 **What was observed.** `website` has **no `supabase/` directory**. The only
 migration in either repository is one file in `Mobile`. A migration named
@@ -188,7 +188,8 @@ migration in either repository is one file in `Mobile`. A migration named
 reverted, and exists in **no** repository. A second, `add_packing_start_completion_date_modes`,
 exists only as an uncommitted file in an older local checkout.
 
-**Why it matters.** 63+ tables and 49+ functions have one migration between them.
+**Why it matters.** 67 live tables and 83 live functions have one migration
+between them.
 There is no reviewable history, no revert path, and no way to create an
 environment that provably matches production.
 
@@ -206,20 +207,18 @@ baseline dump of the current schema as a first migration. See
 
 **What was observed.** `orders` has `production_status` and `commercial_status`,
 both **plain strings with no enum and no check constraint** — the database does not
-constrain them. Values appearing as literals across both repositories: `pending`,
-`in_progress`, `completed`, `on_hold`, `cancelled`, `delivered`, `draft`,
-`invoiced`, `paid`.
+constrain them. Live values on 2026-08-20 are `completed`, `in_progress`,
+`on_hold`, `pending` for `production_status`, and `approved`, `draft`,
+`invoiced` for `commercial_status`.
 
-**Why it is unresolved.** Which value belongs to which column, and which
-transitions are legal, is asserted by no source. The split shown in
-[Database model](/docs/backend/database-model) is inferred from usage context only.
+**Why it is unresolved.** The live vocabulary is known, but legal transitions are
+asserted by no source.
 
 **Why it matters.** Two applications write these columns. A value one application
 does not recognise passes silently.
 
-**What would resolve it.** `SELECT DISTINCT production_status, commercial_status
-FROM orders`, plus a product decision on the legal transitions. Consider a check
-constraint or enum afterwards.
+**What would resolve it.** A product decision on the legal transitions. Consider
+a check constraint or enum afterwards.
 
 ---
 
@@ -251,7 +250,7 @@ cross-reference.
 
 ### What are the live RLS policies on `packer_sessions`?
 
-**Impact: High. Status: open.**
+**Impact: High. Status: closed 2026-08-20.**
 
 **What was observed.** The one migration in the repositories creates a
 `packer_sessions` manage policy predicated on `orders.status IN ('pending','in_progress')`.
@@ -259,13 +258,11 @@ cross-reference.
 reads one. The migration `DROP POLICY IF EXISTS`es three policies before creating
 the new ones.
 
-**Why it matters.** If the `CREATE` failed, the table has RLS enabled and no manage
-policy — failing closed. If it succeeded against a column since removed, the live
-policy differs from the file and nobody knows what it says. Either way, **who can
-write to `packer_sessions` is currently unknown.**
-
-**What would resolve it.** Dump the live policies on `packer_sessions` and
-`attendance_logs`, and confirm whether `orders.status` ever existed.
+**Resolved from live Supabase.** The live manage policy uses
+`orders.production_status IN ('pending','in_progress')`, not the missing
+`orders.status` column. The table has three live policies. One is a temporary
+broad authenticated policy; that is now a security review item, not an unanswered
+catalog question.
 
 ---
 
@@ -273,20 +270,16 @@ write to `packer_sessions` is currently unknown.**
 
 ### Does bucket `order_media` exist, and is it public?
 
-**Impact: High. Status: open.**
+**Impact: High. Status: closed 2026-08-20.**
 
 **What was observed.** `Mobile` uploads package photographs to bucket
 **`order_media`** and immediately calls `getPublicUrl()`. `website` reads and
 writes bucket **`media`** in six places. Only `media` appears in the schema
 snapshot. Filenames are `orderPackageId/timestamp.ext`.
 
-**Why it matters.** Two possibilities, both bad. If `order_media` does not exist,
-field photography is silently failing. If it exists and is public, client cargo
-imagery is readable by anyone holding a structurally guessable URL — see
-[H2](/docs/security/findings#h2).
-
-**What would resolve it.** List the project's buckets with their public flags and
-policies. **Highest-priority verification item.**
+**Resolved from live Supabase.** `order_media` does not exist as a storage bucket
+or public table. Live storage buckets are `media` and `signatures`, and both are
+public. The Mobile code is therefore misaligned with the live storage model.
 
 ---
 
@@ -303,13 +296,11 @@ policies. **Highest-priority verification item.**
 application or the Edge Function reads any of them** — `create-user` even selects
 `can_manage_roles` and then ignores it.
 
-**Why it matters.** The flags look authoritative to a newcomer. If they are
-enforced in RLS, the real model is richer than the code suggests. If not, they are
-a half-built system that should be finished or removed.
-
-**What would resolve it.** Search live RLS policies and function bodies for
-references to the flags, to `user_has_permission`, and to
-`user_effective_permissions`.
+**Resolved from live Supabase.** The flags are enforced in database helpers and
+RLS. `roles` policies call `user_has_permission('can_manage_roles')`, and
+`profiles` policies call `user_has_permission('can_block_users')` for a
+`project_lead` path. The live `user_effective_permissions` view also merges base
+role flags with active temporary privileges.
 
 ---
 
@@ -317,7 +308,7 @@ references to the flags, to `user_has_permission`, and to
 
 ### Is phone/SMS authentication enabled in the project?
 
-**Impact: Medium. Status: open.**
+**Impact: Medium. Status: closed 2026-08-20.**
 
 **What was observed.** `Mobile` implements `signInWithPhone` and `verifyOtp` and
 exposes both through `AuthContext`. **No screen calls them.**
@@ -381,11 +372,10 @@ created this account" during an incident or review.
 `website` provides `admin_force_release_packer`, which only makes sense if a packer
 can become stuck attached to an order.
 
-**Why it is unresolved.** Whether a trigger, a function, or mere convention
-enforces the single-active-order rule is not shown by any source.
-
-**What would resolve it.** Inspect triggers on `profiles` and `order_team_members`,
-and the body of `admin_force_release_packer`.
+**Resolved from live Supabase.** `order_team_members` has an enabled trigger
+`trigger_enforce_single_active_order_for_packer` backed by function
+`enforce_single_active_order_for_packer`, plus related team-change triggers that
+sync `profiles.current_order_id` and packer status.
 
 ---
 
@@ -442,7 +432,7 @@ the session's copies are stale, and any UI reading them shows outdated values.
 
 ### Which report packed-date logic is live today?
 
-**Impact: High. Status: open.**
+**Impact: High. Status: closed 2026-08-20.**
 
 **What was observed.** An incident log records the report date logic being changed
 to `COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` via a
@@ -451,13 +441,11 @@ migration named `prefer_instance_packed_at_in_reports`, and then **reverted on
 `add_packing_start_completion_date_modes` exists as an uncommitted file in an older
 checkout, implying more work followed.
 
-**Why it matters.** The log measures the difference: the same client report showed
-**11 boxes** under one formula and **22** under the other. This directly affects
-client-facing output.
-
-**What would resolve it.** Dump the live body of `fetch_report_instances` and the
-full set of accepted `p_date_mode` values. See
-[W6](/docs/workflows/w6-packing-evidence#the-report-date-rule).
+**Resolved from live Supabase.** The current overload with `p_tag_ids` uses
+`COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` for
+completion-style modes. It accepts `packing_started_at`,
+`packing_completed_at`, `item_packed_at`, and falls back to instance creation for
+unrecognised modes. `item_packed_at` is a legacy alias for completion.
 
 ---
 

@@ -10,24 +10,24 @@ Both applications share one Supabase project. This page describes that schema as
 far as the repositories can establish it.
 
 <Status
-  type="partial"
-  date="2026-08-19"
+  type="verified"
+  date="2026-08-20"
   sources={[
     'website:src/types/supabase.ts',
     'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
     'website:inspect_rpc.js',
     'website:inspect_instances.js',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  Object inventories, column shapes, enums and foreign keys were read from the
-  generated types snapshot, which is **known to be stale** — see
-  [Schema provenance](./schema-provenance). Nothing here was verified against the
-  live database. Triggers, RLS coverage, grants and storage configuration are
-  **not** in this page because no repository contains them.
+  Repository schema artifacts were checked against read-only live Supabase
+  catalog queries. The generated types snapshot is confirmed stale; current
+  live counts, RLS, storage and trigger summaries are recorded in
+  [Live backend verification](./live-verification).
 </Status>
 
 ## Inventory
 
-### VERIFIED FROM SOURCE
+### Generated types snapshot
 
 | Object kind | Count | Source |
 | --- | --- | --- |
@@ -37,27 +37,29 @@ far as the repositories can establish it.
 | Enums | **8** | generated types |
 | Foreign keys | **188** | generated types |
 
-Plus, used by application code but **absent** from the snapshot: 5 further
-tables (`order_item_allocation`, `destinations`, `allocation_increase_requests`,
-`signatures`, `order_media`) and 8 further functions. So the real counts are
-higher than the table above.
+### Live project
 
-### REQUIRES LIVE DATABASE VERIFICATION
+| Object kind | Count | Source |
+| --- | ---: | --- |
+| Tables | **67** | live Supabase catalog |
+| Views | **3** | live Supabase catalog |
+| Functions | **83** | live Supabase catalog |
+| Enums | **11** | live Supabase catalog |
+| Non-internal triggers | **17** | live Supabase catalog |
 
-- The current number of tables, views and functions. An older internal document
-  recorded 67 tables; the snapshot declares 63. Neither figure is current.
-- The trigger inventory. **No repository contains any trigger definition.**
-- RLS coverage. Policies exist in source for exactly **two** tables.
-- Which of the 49+ functions are `SECURITY DEFINER`. Only three are provable.
-- Storage bucket configuration and policies.
-- `GRANT`s on any function except the three in the migration.
+Used by application code but absent from the generated types and confirmed live:
+`order_item_allocation`, `destinations`, `allocation_increase_requests`,
+`signatures`.
+
+Used by `Mobile` but **not** found live as a storage bucket or table:
+`order_media`.
 
 ## The three views
 
 `packer_availability_status`, `task_status_view`, `user_effective_permissions`.
 
-`user_effective_permissions` is notable: it exists, and **no application code
-reads it**. Its purpose is unverified.
+`user_effective_permissions` is notable: no application code reads it directly,
+but live RLS and helper functions do use the permission-flag system.
 
 ## Enums
 
@@ -74,6 +76,10 @@ The only value sets the database itself constrains:
 | `request_action` | approved, rejected |
 | `securing_side` | big_sides, small_sides, lid, base |
 
+Live has three additional enums not present in the generated types:
+`MediaCategory`, `maintenance_task_status`, and `material_type`. Live
+`request_type` also includes `allocation_increase`.
+
 There is **no role enum**. Roles are rows in a `roles` table — see
 [Roles and permissions](/docs/website/roles-and-permissions).
 
@@ -87,19 +93,17 @@ orders.commercial_status   plain string, no enum, no check constraint
 ```
 
 Because both are unconstrained strings, **the database does not enforce the
-vocabulary**. The permitted values exist only as literals in application code.
-Values observed across both repositories:
+vocabulary**. Live values observed on 2026-08-20:
 
-| Column (by usage context) | Values seen in code |
+| Column | Live values |
 | --- | --- |
-| production-side | `pending`, `in_progress`, `completed`, `on_hold`, `cancelled`, `delivered` |
-| commercial-side | `draft`, `invoiced`, `paid` |
+| `production_status` | `completed`, `in_progress`, `on_hold`, `pending` |
+| `commercial_status` | `approved`, `draft`, `invoiced` |
 
 :::warning This mapping is inferred from usage, not declared anywhere
 
-Which value belongs to which column, and which transitions are legal, is **not
-established by any source**. Do not treat the split above as authoritative. See
-[OQ-012](/docs/reference/open-questions#oq-012).
+The live vocabulary is now known, but legal transitions are still not declared
+anywhere. See [OQ-012](/docs/reference/open-questions#oq-012).
 
 :::
 
@@ -213,14 +217,18 @@ Some are plausibly trigger bodies or scheduled jobs — `deactivate_expired_priv
 and `refresh_order_pkg_overview_rollup` read that way. **This is inference, not
 evidence.** Their status is [OQ-013](/docs/reference/open-questions#oq-013).
 
-Verified signature, from <SourceRef repo="website" path="inspect_rpc.js" />:
+Source-era signature, from <SourceRef repo="website" path="inspect_rpc.js" />:
 
 ```text
 fetch_report_instances(p_client_id, p_order_ids, p_date_from, p_date_to,
                        p_date_mode, p_destinations, p_has_items_only, p_tag_ids)
 ```
 
-`p_date_mode` accepts at least `item_packed_at`.
+The live project has three overloads. The newest overload adds `p_tag_ids` and
+uses `COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` for
+completion-style date modes. `item_packed_at` is retained as a legacy alias for
+completion; `packing_started_at` uses the first packed item timestamp. See
+[Live backend verification](./live-verification#report-date-logic).
 
 ## The only RLS and functions written down anywhere
 
@@ -242,25 +250,22 @@ for that order.
 **RLS policies for two tables** — `attendance_logs` and `packer_sessions`:
 manage for admin/director/team-lead, `SELECT` own rows for packers.
 
-:::danger One policy references a column that does not exist
+:::warning The source policy differs from production
 
 The `packer_sessions` manage policy is predicated on
 `orders.status IN ('pending','in_progress')`. `orders` has no `status` column in
-the schema snapshot, and no application code reads one. Either this migration
-never applied, or the live policy differs from the file.
+the schema snapshot, and no application code reads one. Live verification shows
+production differs from the file: the live policy uses
+`orders.production_status IN ('pending','in_progress')`.
 
-The migration `DROP POLICY IF EXISTS`es three policies before creating the new
-ones, so a failed `CREATE` would leave `packer_sessions` with RLS enabled and no
-manage policy at all. **Live verification required before touching packer
-session behaviour** —
-[OQ-014](/docs/reference/open-questions#oq-014).
+This proves the repository migration is not the full source of truth for RLS.
+Before changing packer session behaviour, read
+[Live backend verification](./live-verification#high-signal-live-policy-facts).
 
 :::
 
 ## What is deliberately not on this page
 
-No table-by-table column reference, no policy catalogue, no trigger list. Those
-would have to be written from the live database, would rot immediately, and
-would be indistinguishable from invention if written from the stale snapshot.
-Regenerating them from the database is the right answer — see
-[Schema provenance](./schema-provenance).
+No table-by-table column reference and no full policy body catalogue. Those would
+rot quickly if copied into prose. Regenerating them from the database is the right
+answer — see [Schema provenance](./schema-provenance).

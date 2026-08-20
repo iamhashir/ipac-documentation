@@ -8,13 +8,14 @@ description: Tooling and access required before either IPAC application will run
 
 <Status
   type="partial"
-  date="2026-08-19"
+  date="2026-08-20"
   sources={[
     'Mobile:.nvmrc',
     'Mobile:package.json',
     'Mobile:README.md',
     'website:package.json',
     'website:.github/workflows/',
+    'ipac-documentation:.vercel/project.json',
   ]}>
   Tooling requirements were read directly from configuration files. The
   supported Node version is contradictory across sources and is recorded as
@@ -26,7 +27,7 @@ description: Tooling and access required before either IPAC application will run
 
 | Tool | Needed for | Notes |
 | --- | --- | --- |
-| Node.js | Both applications | `Mobile` pins **22.19.0** in `.nvmrc`. `website` validates pull requests on 22.x but builds production on 24.x. See [OQ-006](/docs/reference/open-questions#oq-006). |
+| Node.js | Both applications and docs | `Mobile` and `ipac-documentation` pin **22.19.0** in `.nvmrc`. `website` validates pull requests on 22.x but builds production on 24.x. The Vercel docs project is also currently set to 24.x, despite this repository declaring 22.x. See [OQ-006](/docs/reference/open-questions#oq-006). |
 | npm | Both applications | Both repositories commit `package-lock.json`; use npm, not another package manager. |
 | Git | Both applications | — |
 | Android Studio | `Mobile` only | Provides the Android SDK and a bundled JDK. Required to build the native development client. |

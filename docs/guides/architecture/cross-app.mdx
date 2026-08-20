@@ -12,19 +12,20 @@ coupling precisely, because it is the part of IPAC most likely to break.
 
 <Status
   type="verified"
-  date="2026-08-19"
+  date="2026-08-20"
   sources={[
     'website:src/',
     'website:server/',
     'Mobile:app/',
     'Mobile:components/',
     'Mobile:utils/',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
   Table, RPC and storage usage was extracted by scanning every `.ts`/`.tsx` file
   in both repositories for Supabase client calls, including multi-line calls. The
-  inventories below are complete for source; whether each object exists in the
-  live database is a separate question — see
-  [Schema provenance](/docs/backend/schema-provenance).
+  inventories below are complete for source and key live object mismatches were
+  checked read-only; see
+  [Live backend verification](/docs/backend/live-verification).
 </Status>
 
 ## The shape of the coupling
@@ -168,8 +169,8 @@ Rules that both applications depend on but neither owns:
 | Role name decides application access | duplicated in four places, inconsistently | VERIFIED — see [Roles and permissions](/docs/website/roles-and-permissions) |
 | Team-lead status is **per order**, not a global role | `order_team_members.is_team_lead` | VERIFIED |
 | Team leads may manage attendance for their order | `can_user_mark_attendance`, `SECURITY DEFINER` | VERIFIED |
-| A packer has at most one active order | `profiles.current_order_id` exists; enforcement mechanism unknown | REQUIRES LIVE DATABASE VERIFICATION |
-| Packed date must not move when a box is reworked | recorded in a Trail log, implemented in an RPC that was reverted | PARTIAL — see [W6](/docs/workflows/w6-packing-evidence) |
+| A packer has at most one active order | live `order_team_members` trigger `trigger_enforce_single_active_order_for_packer` | VERIFIED |
+| Packed date must not move when a box is reworked | live `fetch_report_instances` prefers `order_pkg_instance.packed_at` for completion modes | VERIFIED — see [W6](/docs/workflows/w6-packing-evidence) |
 
 ## Breaking-change hotspots
 
@@ -203,9 +204,8 @@ that an `ON CONFLICT` clause depends on.
 
 ### 5. `attendance_logs` and `task_logs`
 
-Mobile writes, website reads and remediates. These are the two tables whose RLS
-policies are the only ones written down anywhere — and one of the two policies
-references a column that does not exist.
+Mobile writes, website reads and remediates. Live RLS exists on both tables; the
+source migration for `packer_sessions` is stale and differs from production.
 
 ### 6. The two storage buckets
 
@@ -216,10 +216,9 @@ package photos to bucket **`order_media`** (1 call site,
 <SourceRef repo="Mobile" path="utils/api/supabase.ts" />), then derives a public
 URL for them.
 
-Only `media` appears in the schema snapshot. Whether `order_media` exists, and
-whether Mobile-uploaded imagery is reachable by the website report path,
-**requires live verification** —
-[OQ-015](/docs/reference/open-questions#oq-015).
+Only `media` appears in the schema snapshot, and live Supabase has no
+`order_media` bucket. Mobile-uploaded imagery is therefore not aligned with the
+website report path.
 
 :::
 

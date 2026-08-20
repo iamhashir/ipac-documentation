@@ -68,12 +68,12 @@ sequenceDiagram
 The function permits **`director` or `admin` only**. Notably it also selects
 `roles.can_manage_roles` and then **never uses it** — the decision is a hardcoded
 role-name comparison. See
-[Roles and permissions](/docs/website/roles-and-permissions#the-permission-flags-nothing-reads).
+[Roles and permissions](/docs/website/roles-and-permissions#permission-flags-are-database-side-only).
 
 Any role name present in the `roles` table can be **assigned**, because the
-function looks the name up rather than validating against a list. So the set of
-assignable roles is whatever the live `roles` table contains —
-[OQ-002](/docs/reference/open-questions#oq-002).
+function looks the name up rather than validating against a list. Live assignable
+roles are `admin`, `client`, `executive`, `packer`, and `sales`; `director` is
+checked as a creator role in source but does not exist as a live role row.
 
 ## Direct SQL provisioning breaks sign-in {#direct-sql-provisioning-breaks-sign-in}
 

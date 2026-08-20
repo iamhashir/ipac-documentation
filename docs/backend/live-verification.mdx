@@ -1,0 +1,195 @@
+---
+title: Live backend verification
+sidebar_label: Live verification
+description: Read-only verification results from the live IPAC Supabase project and Vercel documentation deployment.
+---
+
+# Live backend verification
+
+<Status
+  type="verified"
+  date="2026-08-20"
+  sources={[
+    'Supabase project fqynbudvpvpiljdrrvem',
+    'Vercel project prj_JmwilDaL0qk60puwV6c44yK3HL2Y',
+    'ipac-documentation:.vercel/project.json',
+    'ipac-documentation:vercel.json',
+    'ipac-documentation:package.json',
+  ]}>
+  This page was produced from read-only Supabase catalog queries and read-only
+  Vercel CLI inspection. It records object names, counts and policy shape only;
+  no row-level user data or secret values are included.
+</Status>
+
+## Current deployment state
+
+| Item | Verified value |
+| --- | --- |
+| Supabase project | `ipac-production` |
+| Supabase ref | `fqynbudvpvpiljdrrvem` |
+| Region | `ap-south-1` |
+| Postgres | 17.4.1, engine 17 |
+| Vercel team | `ipacapps` |
+| Vercel project | `ipac-documentation` |
+| Vercel project ID | `prj_JmwilDaL0qk60puwV6c44yK3HL2Y` |
+| Vercel deployment protection | SSO protection for all deployments except custom domains |
+| Vercel aliases | none |
+| Vercel team domains | none |
+| Vercel environment variables | none |
+
+The docs repository is on `main`, `origin` is
+`https://github.com/ipacapps/ipac-documentation.git`, and the checkout was
+already up to date on 2026-08-20.
+
+### Vercel configuration drift
+
+The approved model says Node 22.x. The repository also says Node 22.x
+(`package.json` engines and `.nvmrc` = `22.19.0`), but the Vercel project setting
+is currently **Node 24.x**. That is configuration drift. Do not change it silently:
+it is deployment configuration and should be corrected deliberately.
+
+`vercel.json` declares `npm ci`, `build` output, Docusaurus, `cleanUrls: true`,
+and no environment variables.
+
+## Live object inventory
+
+| Object kind | Live count |
+| --- | ---: |
+| Public tables | 67 |
+| Public views | 3 |
+| Public functions | 83 |
+| Public enums | 11 |
+| Public non-internal triggers | 17 |
+
+The live schema is larger than `website/src/types/supabase.ts`, which declares
+63 tables, 3 views, 49 functions and 8 enums. The generated types are confirmed
+stale.
+
+Tables that source expected but the generated types lacked and live confirms:
+`allocation_increase_requests`, `destinations`, `order_item_allocation`,
+`signatures`.
+
+`order_media` was not found as a public table or as a storage bucket.
+
+## Roles
+
+Live `roles.name` rows:
+
+| Role | Profiles using it |
+| --- | ---: |
+| `admin` | 4 |
+| `client` | 4 |
+| `executive` | 1 |
+| `packer` | 25 |
+| `sales` | 1 |
+
+There is no live `director`, `project_lead`, `team_lead` or `customer` role row.
+Those names may still appear in code, policies or historical docs, but they are
+not current role records.
+
+## Storage
+
+| Bucket | Public | Notes |
+| --- | --- | --- |
+| `media` | yes | No size or MIME restriction recorded. |
+| `signatures` | yes | 2 MiB limit; PNG, JPEG, WebP and SVG allowed. |
+
+No `order_media` bucket exists. Mobile code that writes to `order_media` is
+therefore not aligned with the live project.
+
+## Shared-table RLS matrix
+
+Counts are policy counts by operation, with `ALL` policies counted for every
+operation they cover.
+
+| Table | RLS | SELECT | INSERT | UPDATE | DELETE | Notes |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `attendance_logs` | on | 3 | 2 | 2 | 2 | Includes staff/team-lead management and own-row packer read. |
+| `clients` | on | 4 | 1 | 1 | 1 | Client scoping exists in policy set. |
+| `destinations` | on | 2 | 1 | 1 | 1 | Includes public read and staff/packer management. |
+| `items_db` | on | 2 | 1 | 1 | 1 | Public-role policies present. |
+| `material_variants` | on | 2 | 3 | 2 | 1 | Request workflow policies present. |
+| `materials` | on | 2 | 2 | 1 | 1 | Request workflow policies present. |
+| `media` | on | 2 | 1 | 1 | 1 | Client-owned media read plus staff/packer management. |
+| `order_item_allocation` | on | 2 | 1 | 1 | 1 | Clients read own allocations; staff/packers manage. |
+| `order_packages` | on | 7 | 3 | 3 | 1 | Largest policy set in this matrix. |
+| `order_pkg_instance` | on | 2 | 1 | 1 | 1 | Client and staff/packer paths present. |
+| `order_pkg_overview` | on | 2 | 1 | 1 | 1 | Client and staff/packer paths present. |
+| `order_team_members` | on | 2 | 1 | 1 | 1 | Authenticated full modification policy exists. |
+| `orders` | on | 8 | 2 | 2 | 1 | Includes client, staff, executive, and packer policies. |
+| `package_items` | on | 2 | 1 | 1 | 1 | Authenticated broad policy exists. |
+| `packer_sessions` | on | 3 | 2 | 2 | 2 | Live policy uses `orders.production_status`, not missing `orders.status`; also has temporary authenticated access. |
+| `pkd_item` | on | 2 | 1 | 1 | 1 | Client and staff/packer paths present. |
+| `profiles` | on | 2 | 1 | 2 | 0 | No delete policy; own-profile and staff reads. |
+| `qr_codes` | on | 1 | 1 | 1 | 1 | Broad policy shape; review before expanding QR use. |
+| `roles` | on | 2 | 1 | 1 | 1 | Read policy still uses deprecated `auth.role()`. |
+| `supplier_pricing` | on | 2 | 2 | 1 | 1 | Request workflow policies present. |
+| `suppliers` | on | 2 | 2 | 1 | 1 | Includes broad read. |
+| `task_assignments` | on | 1 | 1 | 1 | 0 | No delete policy. |
+| `task_logs` | on | 2 | 1 | 1 | 0 | No delete policy. |
+| `task_packages` | on | 1 | 1 | 0 | 0 | No update/delete policy. |
+| `tasks` | on | 2 | 1 | 1 | 1 | Broad authenticated policy exists. |
+| `temporary_privileges` | on | 1 | 1 | 1 | 0 | Users read own rows; admin/director grant and revoke. |
+
+Many policies target the Postgres `public` role and then check `auth.uid()` or
+helper functions internally. That is valid but easy to misread: a `public` policy
+does not necessarily mean anonymous access. Review each policy body before
+changing authorization.
+
+## High-signal live policy facts
+
+- `packer_sessions` no longer matches the repository migration. The live manage
+  policy checks `orders.production_status IN ('pending','in_progress')`, not the
+  non-existent `orders.status`.
+- A separate `packer_sessions` policy named `Temporary all authenticated access`
+  allows any authenticated user through `auth.uid() IS NOT NULL`. That should be
+  reviewed before relying on the stricter policy.
+- `get_user_email_by_username(lookup_username text)` is `SECURITY DEFINER` and is
+  executable by `anon` and `authenticated`, matching the username-login flow.
+- 48 public functions are `SECURITY DEFINER`; many are also executable by `anon`.
+  This is much broader than the source-only docs previously established.
+- `roles` has a read policy using deprecated `auth.role()`. Future RLS edits
+  should use policy `TO` clauses instead.
+
+## Triggers
+
+All 17 live non-internal public triggers are enabled:
+
+| Table | Trigger | Function |
+| --- | --- | --- |
+| `app_settings` | `update_app_settings_updated_at` | `update_app_settings_updated_at` |
+| `client_report` | `trg_assign_report_number` | `assign_report_number` |
+| `client_report` | `trg_client_report_updated_at` | `update_updated_at` |
+| `maintenance_task_assignments` | `update_maintenance_task_assignments_modtime` | `set_maintenance_task_assignments_updated_at` |
+| `maintenance_task_log` | `update_maintenance_task_log_modtime` | `set_maintenance_task_log_updated_at` |
+| `order_pkg_instance` | `trg_instance_destination_packed_sync` | `trg_instance_destination_packed_sync` |
+| `order_pkg_instance` | `trg_order_pkg_instance_rollup` | `trg_order_pkg_instance_rollup` |
+| `order_pkg_instance` | `trg_set_order_pkg_instance_updated_at` | `set_order_pkg_instance_updated_at` |
+| `order_pkg_overview` | `trg_set_order_pkg_overview_updated_at` | `set_order_pkg_overview_updated_at` |
+| `order_team_members` | `trg_sync_profile_on_order_team_delete` | `sync_profile_on_order_team_change` |
+| `order_team_members` | `trg_sync_profile_on_order_team_insert` | `sync_profile_on_order_team_change` |
+| `order_team_members` | `trigger_enforce_single_active_order_for_packer` | `enforce_single_active_order_for_packer` |
+| `order_team_members` | `trigger_handle_empty_order` | `handle_empty_order` |
+| `order_team_members` | `trigger_update_packer_status_on_team_change` | `update_packer_status_on_assignment` |
+| `orders` | `trigger_update_packer_status_on_completion` | `update_packer_status_on_order_completion` |
+| `pkd_item` | `trg_pkd_item_packed_sync` | `trg_pkd_item_packed_sync` |
+| `profiles` | `trigger_log_packer_status_change` | `log_packer_status_change` |
+
+## Report date logic
+
+The live `fetch_report_instances` overload with `p_tag_ids` uses:
+
+```text
+COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))
+```
+
+for completion-style date modes. It accepts `packing_started_at`,
+`packing_completed_at`, `item_packed_at`, and falls back to instance creation for
+unrecognised modes. `item_packed_at` is treated as a legacy alias for completion.
+
+## Temporary privileges
+
+`temporary_privileges` exists, has RLS, and currently has zero rows. The live
+`user_effective_permissions` view and `user_has_permission` function both confirm
+that role permission flags are enforced at least inside database authorization
+helpers, even though application code does not read the flags directly.

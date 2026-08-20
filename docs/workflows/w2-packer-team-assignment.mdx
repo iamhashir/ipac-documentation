@@ -80,9 +80,10 @@ a lead change with a status change, implying the two are coupled. `website` has 
 `admin_force_release_packer` RPC, which only makes sense if a packer can become
 stuck attached to an order.
 
-**How single-active-order is enforced — trigger, function, or convention — is not
-established by source.** Do not build on an assumption here;
-[OQ-020](/docs/reference/open-questions#oq-020).
+Live verification shows single-active-order enforcement is handled by an enabled
+`order_team_members` trigger, `trigger_enforce_single_active_order_for_packer`,
+backed by function `enforce_single_active_order_for_packer`. Related triggers
+sync `profiles.current_order_id` and packer status.
 
 ## Breaking-change note
 

@@ -10,8 +10,8 @@ This page describes how authorization is **designed** to work. For where it does
 not, see [Findings](./findings).
 
 <Status
-  type="partial"
-  date="2026-08-19"
+  type="verified"
+  date="2026-08-20"
   sources={[
     'website:src/lib/access.ts',
     'website:src/hooks/usePageAccess.ts',
@@ -20,11 +20,11 @@ not, see [Findings](./findings).
     'Mobile:utils/AuthContext.tsx',
     'Mobile:supabase/functions/create-user/index.ts',
     'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
-  All four enforcement layers were read directly in source. **RLS — the layer
-  that actually protects data — could not be verified**: policies exist in source
-  for only two of 63+ tables. Treat the RLS section as a description of the
-  intended design, not of the live configuration.
+  All four enforcement layers were read directly in source and the live RLS
+  catalog was queried read-only. This page summarizes the model; the table-level
+  matrix is in [Live backend verification](/docs/backend/live-verification).
 </Status>
 
 ## Authentication
@@ -108,8 +108,7 @@ preserving in any replacement.
 
 **Decides:** capability, independent of which client is calling.
 
-Only three functions are provably `SECURITY DEFINER`, all from the single
-migration, all granted to `authenticated`:
+Source proves three `SECURITY DEFINER` functions from the single migration:
 
 | Function | Grants when |
 | --- | --- |
@@ -120,69 +119,65 @@ migration, all granted to `authenticated`:
 This layer is the most trustworthy authorization in the system, because it runs
 in the database and cannot be bypassed by a client. It is also the smallest.
 
-`get_user_email_by_username` is called pre-authentication and is described in
-source as running with elevated privileges — so it is almost certainly a fourth
-`SECURITY DEFINER` function, but its definition is in no repository.
+Live verification shows a much broader surface: 48 public functions are
+`SECURITY DEFINER`, including `get_user_email_by_username`, and many are
+executable by `anon` as well as `authenticated`. This matches the username-login
+flow but should be treated as sensitive API surface.
 
 ## Layer 4 — Row Level Security
 
 **Decides:** everything that matters.
 
-Because Layer 1 is advisory and Layers 2–3 cover a handful of operations, RLS is
-the actual security boundary for the great majority of the 63+ tables.
+Because Layer 1 is advisory and Layers 2–3 cover a subset of operations, RLS is
+the actual security boundary for the great majority of the 67 live tables.
 
-### What source proves
+### What live verification proves
 
-Exactly two tables have policies written down, both in the single migration:
+Every live public table has RLS enabled. The 26 shared tables have at least one
+policy, and the detailed operation matrix is recorded in
+[Live backend verification](/docs/backend/live-verification#shared-table-rls-matrix).
 
-**`attendance_logs`** — one `FOR ALL` policy for admin/director (with
-`profiles.status = 'active'`) or the order's team lead; one `FOR SELECT` policy
-letting packers read `packer_id = auth.uid()`.
+`packer_sessions` differs from the repository migration: the live manage policy
+uses `orders.production_status IN ('pending','in_progress')`, not the missing
+`orders.status` column. It also has a separate policy named `Temporary all
+authenticated access` that allows any authenticated user. Review that policy
+before relying on the stricter team-lead/admin rule.
 
-**`packer_sessions`** — the same shape, except its manage policy additionally
-requires the order to be in an active state, expressed as
-`orders.status IN ('pending','in_progress')` — a column that does not exist.
+### What remains unresolved
 
-### What requires live verification
+Still unresolved:
 
-Everything else:
+- whether phone/SMS auth is enabled in Supabase Auth
+- whether `audit_log` completely covers user creation events
+- whether each permissive `SECURITY DEFINER` grant is intentional
 
-- policies on the other ~61 tables
-- whether RLS is enabled on all of them
-- whether `client`-role users are correctly scoped to their own `client_id`
-- storage bucket policies for `media`, `order_media` and `signatures`
-- function `GRANT`s, in particular whether `get_user_email_by_username` is
-  callable by `anon`
+**Do not assume a table is protected from a policy count alone.** Counts show
+coverage, not correctness. Review policy bodies before changing authorization.
 
-**Do not assume a table is protected because it is not mentioned here.** Assume
-nothing; query the database. Tracked as
-[OQ-008](/docs/reference/open-questions#oq-008) and
-[OQ-014](/docs/reference/open-questions#oq-014).
-
-## The permission-flag system is inert
+## The permission-flag system
 
 `roles` carries six booleans — `can_manage_roles`, `can_ban_users`,
 `can_block_users`, `can_delete_profiles`, `can_reset_passwords`,
 `can_unblock_users` — and a `user_effective_permissions` view plus
 `user_has_permission` and `get_user_role` functions exist.
 
-**No authorization decision in either application reads any of them.** Every
-real check compares role *names*. The `create-user` Edge Function even selects
-`can_manage_roles` and then ignores it in favour of a hardcoded name comparison.
+**No authorization decision in either application reads any of them directly.**
+Every client-side check compares role *names*. The `create-user` Edge Function
+even selects `can_manage_roles` and then ignores it in favour of a hardcoded name
+comparison.
 
-The intended design is therefore unclear: either the flags are a half-built
-system, or they are enforced somewhere only RLS can show us. Do not build on them
-until that is established —
-[OQ-016](/docs/reference/open-questions#oq-016).
+Live RLS and helper-function verification shows the flags are enforced inside the
+database through `user_has_permission` and `user_effective_permissions`. The
+permission-flag system is therefore real at the database layer, even though the
+applications do not surface it cleanly.
 
 ## Temporary privileges
 
 A `temporary_privileges` table exists (`user_id`, `granted_role_id`,
 `granted_by`, `expires_at`, `is_active`, `reason`) alongside a
-`deactivate_expired_privileges` function that **no application calls**. Time-boxed
-role elevation is therefore part of the design, is presumably operationally live,
-and is entirely undocumented. Its mechanism is
-[OQ-013](/docs/reference/open-questions#oq-013).
+`deactivate_expired_privileges` function. Live verification found zero rows on
+2026-08-20, but the view and helper functions prove time-boxed role elevation is
+part of the database authorization design.
 
 ## Assumptions this model makes about clients
 

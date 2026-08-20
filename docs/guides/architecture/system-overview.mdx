@@ -38,8 +38,8 @@ flowchart TB
 ```
 
 <Status
-  type="partial"
-  date="2026-08-19"
+  type="verified"
+  date="2026-08-20"
   sources={[
     'website:package.json',
     'website:src/routes/',
@@ -47,13 +47,12 @@ flowchart TB
     'Mobile:app/',
     'Mobile:package.json',
     'website:docs/ARCHITECTURE.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
   ]}>
   Application stacks, route inventories and directory structures were checked
-  directly in both repositories. **Live backend figures** — table counts, views,
-  buckets, trigger locations — are inherited from
-  `website/docs/ARCHITECTURE.md`, which recorded them on 2026-08-08. They
-  were not re-queried. See
-  [OQ-008](/docs/reference/open-questions#oq-008).
+  directly in both repositories. Live backend figures were re-queried read-only
+  on 2026-08-20; details are in
+  [Live backend verification](/docs/backend/live-verification).
 </Status>
 
 ## The two applications
@@ -93,12 +92,10 @@ they shape everything else in this documentation:
    tell you what happens. See
    [Trigger-driven behaviour](./trigger-driven-behaviour).
 
-As recorded on 2026-08-08 in `website`'s architecture document, the
-project's public schema had row level security enabled on every table, with at
-least one policy each, alongside public views, two storage buckets, and one
-active edge function performing privileged user creation with a service-role
-key. Those figures need re-verification before being relied upon —
-[OQ-008](/docs/reference/open-questions#oq-008).
+As verified live on 2026-08-20, the project has 67 public tables, RLS enabled on
+every public table, 83 public functions, 17 non-internal triggers, and two
+storage buckets. See
+[Live backend verification](/docs/backend/live-verification).
 
 ## The domain, at the highest level
 
@@ -132,20 +129,20 @@ and roles, and media and signatures.
 
 ## Verified backend surface
 
-A source audit on 2026-08-19 established the following. Counts come from a
-generated schema snapshot that is **known to be stale**, so treat them as a lower
-bound — see [Schema provenance](/docs/backend/schema-provenance).
+A source audit on 2026-08-19 was checked against live Supabase on 2026-08-20.
+The generated schema snapshot is stale; live counts are authoritative for the
+current project.
 
 | | |
 | --- | --- |
-| Tables | 63 declared, plus 5 more used by code but undeclared |
+| Tables | 67 live; 63 declared in stale generated types |
 | Views | 3 |
-| Functions | 49 declared, plus 8 more used by code; **24 called by neither application** |
-| Enums | 8 |
+| Functions | 83 live; 49 declared in stale generated types |
+| Enums | 11 live; 8 declared in stale generated types |
 | Foreign keys | 188 |
 | Tables shared by both applications | **26** |
 | RPCs shared by both applications | **1** — `get_user_email_by_username` |
-| Storage buckets in use | `media` (website), `order_media` (Mobile) — **divergent** |
+| Storage buckets | `media`, `signatures`; `order_media` is referenced by Mobile but absent live |
 
 The one-shared-RPC figure is the important one: the applications coordinate
 through table state, not a versioned interface. See
@@ -165,8 +162,9 @@ through table state, not a versioned interface. See
 
 :::note Some sections are still deliberately absent
 
-There is no RLS page, no storage page and no per-feature documentation yet,
-because writing them honestly requires live database access. The two most
+There is no separate RLS page, no separate storage page and no per-feature
+documentation yet; the backend summaries are consolidated in
+[Live backend verification](/docs/backend/live-verification). The two most
 complete legacy sources remain `website/docs/WORKFLOWS.md` and
 `website/docs/ARCHITECTURE.md` — read them alongside
 [Open questions](/docs/reference/open-questions), because several of their claims
@@ -181,7 +179,6 @@ layout guards, row level security, database functions, order assignment, team
 membership, team-lead status, packer session state, and attendance can all
 participate.
 
-**Do not infer access from a role name.** The live role set is contradicted
-across three existing sources, which is recorded as
-[OQ-002](/docs/reference/open-questions#oq-002) and is why this site does not yet
-describe the role model.
+**Do not infer access from a role name alone.** The live role rows are now known,
+but policies, helper functions and application guards still use overlapping role
+concepts.

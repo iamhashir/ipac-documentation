@@ -136,16 +136,17 @@ Interpret the results:
   elsewhere: authentication ([A3](./authentication#a3)) or a table-specific
   permission.
 - **`profiles` read fails** → configuration, network, or RLS on `profiles`.
-- **`profiles` read succeeds, RPC fails** → the function or its grants. Its
-  definition is in no repository; see
+- **`profiles` read succeeds, RPC fails** → the function or its grants. Live
+  verification confirms the username lookup RPC is `SECURITY DEFINER` and
+  callable by `anon`; see
   [M1 in the security findings](/docs/security/findings#m1).
 
 :::info Where source-based diagnosis stops
 
-If the `profiles` read fails with a permission error rather than a network error, the
-cause is RLS — and **RLS cannot be verified from these repositories**. Policies exist
-in source for only two of 63+ tables. Escalate to
-[OQ-008](/docs/reference/open-questions#oq-008) rather than guessing.
+If the `profiles` read fails with a permission error rather than a network error,
+the cause is likely RLS. Use
+[Live backend verification](/docs/backend/live-verification) as the baseline,
+then inspect the current `profiles` policy bodies before changing anything.
 
 :::
 
@@ -210,7 +211,7 @@ ls website/.docs 2>&1      # No such file or directory
 Use the sources that do exist:
 
 - **Database setup:** there is no runnable setup script. The database is **not
-  reproducible from the repositories** — one migration covers 63+ tables. See
+  reproducible from the repositories** — one migration covers 67 live tables. See
   [Schema provenance](/docs/backend/schema-provenance).
 - **Development conventions:** `website/CLAUDE.md` and `website/AGENTS.md` are current
   and useful for everything except the `.docs/` references. `AGENTS.md` in particular
