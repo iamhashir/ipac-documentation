@@ -120,20 +120,22 @@ worth adopting; see
 
 **Impact: Medium. Status: open — facts resolved, decision pending.**
 
-**Resolved from source.** Exactly three values exist:
+**Resolved from source.** The active values are:
 
 | Source | Version |
 | --- | --- |
 | `Mobile/.nvmrc` | 22.19.0 |
+| `ipac-documentation/.nvmrc` | 22.19.0 |
+| Vercel `ipac-documentation` project | 22.x |
 | `website/.github/workflows/pr-validation.yml` | 22.x |
 | `website/.github/workflows/ci-cd.yml` | **24.x** |
 
 `website` therefore validates pull requests on one major and builds production on
 another — a change can pass review and fail in production. The documentation
-repository pins 22.19.0 locally, but the Vercel `ipac-documentation` project is
-currently configured for Node 24.x.
+repository and Vercel `ipac-documentation` project are aligned on Node 22.x as of
+2026-08-20.
 
-**What remains.** Choosing one version per application. That is a decision, not a
+**What remains.** Choosing one version for `website`. That is a decision, not a
 lookup. This documentation site pins 22.19.0, matching `Mobile`.
 
 ---

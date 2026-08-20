@@ -15,6 +15,7 @@ description: Read-only verification results from the live IPAC Supabase project 
     'ipac-documentation:.vercel/project.json',
     'ipac-documentation:vercel.json',
     'ipac-documentation:package.json',
+    'Vercel CLI deployment dpl_2jbcqvpfG4fT2ztjc7nDi2nadpJo',
   ]}>
   This page was produced from read-only Supabase catalog queries and read-only
   Vercel CLI inspection. It records object names, counts and policy shape only;
@@ -32,21 +33,28 @@ description: Read-only verification results from the live IPAC Supabase project 
 | Vercel team | `ipacapps` |
 | Vercel project | `ipac-documentation` |
 | Vercel project ID | `prj_JmwilDaL0qk60puwV6c44yK3HL2Y` |
+| Vercel Node.js version | 22.x |
 | Vercel deployment protection | SSO protection for all deployments except custom domains |
 | Vercel aliases | none |
 | Vercel team domains | none |
 | Vercel environment variables | none |
+| Latest protected preview | `https://ipac-documentation-jmn2oec22-ipacapps.vercel.app` |
 
 The docs repository is on `main`, `origin` is
 `https://github.com/ipacapps/ipac-documentation.git`, and the checkout was
 already up to date on 2026-08-20.
 
-### Vercel configuration drift
+### Vercel Node alignment
 
 The approved model says Node 22.x. The repository also says Node 22.x
-(`package.json` engines and `.nvmrc` = `22.19.0`), but the Vercel project setting
-is currently **Node 24.x**. That is configuration drift. Do not change it silently:
-it is deployment configuration and should be corrected deliberately.
+(`package.json` engines and `.nvmrc` = `22.19.0`), and the Vercel project setting
+was corrected to **Node 22.x** on 2026-08-20.
+
+The latest verified deployment is a protected preview built from commit
+`d1e9820cb99c8c69a4063d432086fcea48d5d472`. Unauthenticated requests redirect to
+Vercel SSO. Authenticated Vercel CLI checks returned 200 for `/`,
+`/docs/security/findings`, `/docs/backend/database-model`, and
+`/docs/backend/live-verification`.
 
 `vercel.json` declares `npm ci`, `build` output, Docusaurus, `cleanUrls: true`,
 and no environment variables.
