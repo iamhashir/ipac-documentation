@@ -8,33 +8,63 @@ description: The shape of the IPAC system — two applications, one shared Supab
 
 IPAC is two applications over one backend.
 
+## System landscape
+
 ```mermaid
 flowchart TB
+  FO["Field Operators"]
+  MA["Managers / Admins"]
+
   subgraph Clients["Client applications"]
-    OPS["Mobile<br/>React Native / Expo<br/>field operations"]
-    ADM["website<br/>TanStack Start<br/>managers and administrators"]
+    MOB["Mobile<br/>React Native / Expo"]
+    WEB["Website<br/>TanStack Start"]
   end
 
-  SB[("Supabase<br/>single shared project")]
+  SUP[("Supabase<br/>single shared project")]
 
-  OPS --> SB
-  ADM --> SB
+  FO --> MOB
+  MOB --> SUP
+  WEB --> SUP
+  MA --> WEB
+```
 
-  subgraph Backend["What Supabase provides"]
-    AUTH["Auth"]
-    PG["PostgreSQL"]
-    RLS["Row level security"]
-    FN["Functions, RPCs, triggers"]
-    ST["Storage buckets"]
-    EF["Edge function"]
+## Container architecture
+
+```mermaid
+flowchart TB
+  MOB["Mobile client"]
+  WEB["Website client + server routes"]
+
+  subgraph SUP["Supabase"]
+    AUTH["Auth<br/>sessions and user directory"]
+    DB["PostgreSQL<br/>tables, views, enums"]
+    RLS["RLS policies<br/>data authorization"]
+    STO["Storage<br/>media and signatures"]
+    RPC["RPC / functions<br/>privileged and derived behavior"]
+    EDGE["Edge functions<br/>service-role workflows"]
   end
 
-  SB --- AUTH
-  SB --- PG
-  SB --- RLS
-  SB --- FN
-  SB --- ST
-  SB --- EF
+  MOB --> AUTH
+  WEB --> AUTH
+  MOB --> DB
+  WEB --> DB
+  DB --> RLS
+  MOB --> STO
+  WEB --> STO
+  MOB --> RPC
+  WEB --> RPC
+  WEB --> EDGE
+```
+
+## Workflow map
+
+```mermaid
+flowchart LR
+  U["User provisioning"] --> T["Team assignment"]
+  T --> A["Attendance"]
+  A --> S["Packer session"]
+  S --> P["Packing evidence"]
+  P --> R["Reports"]
 ```
 
 <Status

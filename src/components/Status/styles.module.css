@@ -3,13 +3,19 @@
   border-left-width: 4px;
   border-radius: 6px;
   background: var(--ipac-surface-raised);
-  padding: 0.85rem 1rem;
+  padding: 0.95rem 1rem;
   margin: 0 0 1.75rem;
   font-size: 0.9rem;
+  box-shadow: 0 1px 0 rgba(15, 67, 85, 0.04);
 }
 
-.status--verified {
+.status--verified,
+.status--verified-source {
   border-left-color: var(--ifm-color-success);
+}
+
+.status--verified-live {
+  border-left-color: var(--ifm-color-primary);
 }
 
 .status--partial {
@@ -31,11 +37,28 @@
 .label {
   font-weight: 700;
   letter-spacing: 0.01em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
 }
 
 .date {
   color: var(--ipac-muted);
   font-size: 0.82rem;
+}
+
+.question {
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: var(--ipac-accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.05rem 0.35rem;
+}
+
+.description {
+  margin: 0.35rem 0 0;
+  color: var(--ipac-muted);
+  font-size: 0.84rem;
 }
 
 .body {

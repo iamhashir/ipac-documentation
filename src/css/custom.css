@@ -22,12 +22,14 @@
   --ipac-surface-raised: #f7f9fa;
   --ipac-border: #dfe5e8;
   --ipac-muted: #5b6a70;
+  --ipac-focus: #0f9fba;
 
   --ifm-font-family-base:
     system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ifm-code-font-size: 92%;
   --ifm-heading-font-weight: 650;
   --ifm-navbar-shadow: inset 0 -1px 0 var(--ipac-border);
+  --ifm-global-radius: 6px;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
 }
 
@@ -47,22 +49,75 @@ html[data-theme='dark'] {
   --ipac-surface-raised: #1d2126;
   --ipac-border: #2d333a;
   --ipac-muted: #9aa7ae;
+  --ipac-focus: #67c6df;
 
   --ifm-background-color: #14171a;
   --ifm-background-surface-color: #1a1e22;
   --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
 }
 
+*:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ipac-focus) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.navbar {
+  min-height: 3.75rem;
+}
+
+.navbar__brand {
+  margin-right: 1.25rem;
+}
+
+.navbar__title {
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.navbar__item,
+.dropdown__link {
+  font-size: 0.92rem;
+}
+
+.navbar__link {
+  font-weight: 650;
+}
+
+.dropdown__menu {
+  border: 1px solid var(--ipac-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(15, 67, 85, 0.12);
+}
+
+.navbar-sidebar__items {
+  padding-bottom: 1.5rem;
+}
+
 /* Readability: docs prose is the product here. */
 .markdown h1 {
   font-size: 2.15rem;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .markdown > h2 {
   margin-top: 2.4rem;
   padding-top: 0.4rem;
   border-top: 1px solid var(--ipac-border);
+}
+
+.markdown > p,
+.markdown li {
+  line-height: 1.68;
+}
+
+.theme-doc-markdown {
+  max-width: 78ch;
+}
+
+.theme-doc-markdown .docusaurus-mermaid-container,
+.theme-doc-markdown table,
+.theme-doc-markdown pre {
+  max-width: calc(100vw - 2rem);
 }
 
 /* Docusaurus makes tables `display: block; overflow: auto` so they scroll on
@@ -88,15 +143,51 @@ html[data-theme='dark'] {
   max-width: 100%;
 }
 
+.theme-code-block {
+  border: 1px solid var(--ipac-border);
+  border-radius: 8px;
+}
+
+.theme-code-block pre {
+  padding: 1rem;
+}
+
 /* Mermaid diagrams: centre them and let them scroll on narrow screens. */
 .docusaurus-mermaid-container {
   overflow-x: auto;
   margin: 1.5rem 0;
   text-align: center;
+  border: 1px solid var(--ipac-border);
+  border-radius: 8px;
+  background: var(--ipac-surface);
+  padding: 1rem;
 }
 
 .navbar-github-link:hover {
   opacity: 0.75;
+}
+
+.navbarSearchContainer_Bca1,
+.navbar__search {
+  min-width: 12rem;
+}
+
+.navbar__search-input {
+  border: 1px solid var(--ipac-border);
+  border-radius: 6px;
+  background-color: var(--ipac-surface-raised);
+  color: var(--ifm-font-color-base);
+  min-height: 2.15rem;
+}
+
+@media (max-width: 996px) {
+  .navbar__items--right {
+    gap: 0.35rem;
+  }
+
+  .theme-doc-markdown {
+    max-width: none;
+  }
 }
 
 /* Short link labels in tables (e.g. open-question IDs) should not wrap

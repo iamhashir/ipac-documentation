@@ -29,9 +29,9 @@ follows from it.
 ## What is shared
 
 ```mermaid
-flowchart LR
-  OPS["Mobile"] --> S
-  ADM["website"] --> S
+flowchart TB
+  MOB["Mobile"]
+  WEB["Website"]
 
   subgraph S["One Supabase project"]
     direction TB
@@ -41,6 +41,18 @@ flowchart LR
     F["One set of functions,<br/>RPCs and triggers"]
     B["Shared storage buckets"]
   end
+
+  MOB --> A
+  MOB --> D
+  MOB --> P
+  MOB --> F
+  MOB --> B
+
+  WEB --> A
+  WEB --> D
+  WEB --> P
+  WEB --> F
+  WEB --> B
 ```
 
 There is no per-application schema. No application-specific policy set. No

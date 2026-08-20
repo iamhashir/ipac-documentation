@@ -14,12 +14,27 @@ import styles from './styles.module.css';
  *   partial       — some claims verified, others not. Say which in the body.
  *   open-question — a real contradiction or gap. Never resolve it by guessing.
  */
-export type StatusType = 'verified' | 'partial' | 'open-question';
+export type StatusType =
+  | 'verified'
+  | 'verified-live'
+  | 'verified-source'
+  | 'partial'
+  | 'open-question';
 
 const LABELS: Record<StatusType, string> = {
-  verified: 'Status: Verified',
-  partial: 'Status: Partially Verified',
-  'open-question': 'Status: Open Question',
+  verified: 'Verified Source',
+  'verified-live': 'Verified Live',
+  'verified-source': 'Verified Source',
+  partial: 'Partially Verified',
+  'open-question': 'Open Question',
+};
+
+const DESCRIPTIONS: Record<StatusType, string> = {
+  verified: 'Checked against source artifacts.',
+  'verified-live': 'Checked against live production infrastructure.',
+  'verified-source': 'Checked against repository source artifacts.',
+  partial: 'Some claims are verified; unresolved claims are called out in the page.',
+  'open-question': 'A known gap or contradiction remains unresolved.',
 };
 
 export interface StatusProps {
@@ -32,21 +47,38 @@ export interface StatusProps {
    *   'Mobile:app.json'
    */
   sources?: readonly string[];
+  /** Open-question ID such as OQ-006. */
+  question?: string;
   children?: ReactNode;
+}
+
+function normalizeType(type: StatusType, sources: readonly string[] | undefined): StatusType {
+  if (type !== 'verified') {
+    return type;
+  }
+
+  return sources?.some((source) => /supabase|vercel|live/i.test(source))
+    ? 'verified-live'
+    : 'verified-source';
 }
 
 export default function Status({
   type,
   date,
   sources,
+  question,
   children,
 }: StatusProps): ReactNode {
+  const normalizedType = normalizeType(type, sources);
+
   return (
-    <aside className={clsx(styles.status, styles[`status--${type}`])}>
+    <aside className={clsx(styles.status, styles[`status--${normalizedType}`])}>
       <div className={styles.header}>
-        <span className={styles.label}>{LABELS[type]}</span>
-        {date ? <span className={styles.date}>Checked {date}</span> : null}
+        <span className={styles.label}>{LABELS[normalizedType]}</span>
+        {date ? <span className={styles.date}>Last verified: {date}</span> : null}
+        {question ? <span className={styles.question}>{question}</span> : null}
       </div>
+      <p className={styles.description}>{DESCRIPTIONS[normalizedType]}</p>
 
       {children ? <div className={styles.body}>{children}</div> : null}
 
