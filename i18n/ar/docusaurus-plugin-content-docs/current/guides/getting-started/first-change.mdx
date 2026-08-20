@@ -1,0 +1,33 @@
+---
+title: أول تغيير لك
+sidebar_label: أول تغيير
+description: مسار عملي لتنفيذ تعديل صغير في IPAC دون كسر التطبيق الآخر.
+---
+
+<header>
+# أول تغيير لك
+</header>
+
+<Status type="verified" date="2026-08-19">
+  تحافظ هذه الترجمة على المصطلحات التقنية ومستويات الخطر من المصدر الإنجليزي.
+</Status>
+
+قبل كتابة الكود، أجب عن سؤالين:
+
+1. هل يمس التغيير **Mobile** أو **website** أو backend المشترك؟
+2. هل يقرأ أو يكتب table أو RPC أو Auth أو Storage أو RLS أو roles يستخدمها التطبيق الآخر؟
+
+## مستويات الخطر
+
+| المستوى | المعنى |
+| --- | --- |
+| LOW | تعديل UI محلي بلا بيانات مشتركة. |
+| MEDIUM | تعديل يقرأ أو يعرض بيانات مشتركة موجودة. |
+| HIGH | تعديل على Auth أو roles أو RLS أو Storage أو RPC أو schema أو status vocabulary مشترك. |
+
+يشترك التطبيقان في مشروع Supabase واحد. تغيير فرضية في تطبيق قد يكسر الآخر دون خطأ واضح.
+
+## هل يجب تحديث التوثيق؟ {#step-11}
+
+إذا غير التعديل سلوكا أو workflow أو command أو environment variable أو security model أو فرضية cross-app، فحدث `ipac-documentation` في نفس التغيير.
+

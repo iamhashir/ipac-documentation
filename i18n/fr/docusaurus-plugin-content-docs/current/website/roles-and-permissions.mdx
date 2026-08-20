@@ -1,0 +1,169 @@
+---
+title: "Rôles et permissions"
+sidebar_label: "Rôles et permissions"
+description: "Modèle de rôles website, Mobile et Supabase."
+---
+
+# Rôles et permissions {#roles-and-permissions}
+
+**IPAC does ne have one rôle model. It has four, et they disagree.**
+
+This page documents that divergence exactly as source et live base de données state
+show it. It does ne reconcile le four into a single table, parce que doing so est
+a product et authorization-design decision.
+
+<Status
+  type="partial"
+  date="2026-08-20"
+  sources={[
+    'website:src/lib/access.ts',
+    'website:src/hooks/usePageAccess.ts',
+    'Mobile:app/index.tsx',
+    'Mobile:app/(admin)/_layout.tsx',
+    'Mobile:app/(packer)/_layout.tsx',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'website:src/types/supabase.ts',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  All four enforcement points ont été lu directly dans source — le divergence below
+  est **vérifié**, ne inferred. Live rôle rows ont été vérifié on 2026-08-20.
+</Status>
+
+## Rôle names referenced anywhere dans source {#role-names-referenced-anywhere-in-source}
+
+`admin` · `director` · `executive` · `sales` · `client` · `packer`
+
+Live `roles.name` rows sont `admin`, `client`, `executive`, `packer`, et
+`sales`. There est non live `director` row today, even though source checks pour it.
+
+`team_lead` est **ne a rôle**. It est `order_team_members.is_team_lead`, a boolean
+scoped vers one order. A packer peut be team lead on one order et ne on another.
+Treating it as a global rôle est a category error that le codebase itself warns
+about.
+
+## le four enforcement points {#the-four-enforcement-points}
+
+### 1. `website` page access {#1-website-page-access}
+
+<SourceRef repo="website" path="src/lib/access.ts" symbol="FULL_ACCESS_ROLES" />
+
+| Rôle | Access |
+| --- | --- |
+| `admin`, `director`, `executive`, `sales` | All 10 admin pages |
+| `client` | `/dashboard`, `/my-orders`, `/reports` only |
+| `packer` | None — bounced vers login |
+| anything else | None |
+
+le fichier own comment describes `executive` as "le CEO tier (treated as full
+access)". Enforcement est a client-side `useEffect` redirect via
+`useRequirePageAccess`, et one page — `/inventory` — omits it entirely
+([H1](/docs/security/findings#h1)).
+
+### 2. `Mobile` route guards {#2-mobile-route-guards}
+
+<SourceRef repo="Mobile" path="app/index.tsx" /> and the two group layouts.
+
+| Rôle | Destination |
+| --- | --- |
+| `admin`, `director`, `sales` | `(admin)` group |
+| `packer` | `(packer)` group |
+| anything else | redirected vers `/auth/login` |
+
+### 3. `create-user` Edge Function {#3-create-user-edge-function}
+
+<SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" />
+
+Permits `director` ou `admin` only. Anything else receives 403.
+
+### 4. Base de données fonction `can_user_mark_attendance` {#4-database-function-canusermarkattendance}
+
+<SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" />
+
+Grants quand le rôle est `admin` ou `director` **et** `profiles.status = 'active'`,
+**ou** quand le caller est team lead pour that order. `SECURITY DEFINER`, granted vers
+`authenticated` — so this one cannot be bypassed par a client.
+
+## le divergence, side par side {#the-divergence-side-by-side}
+
+| Rôle | `website` pages | `Mobile` app | peut create utilisateurs | peut manage attendance |
+| --- | --- | --- | --- | --- |
+| `admin` | Full | admin group | **Oui** | **Oui** |
+| `director` | Full | admin group | **Oui** | **Oui** |
+| `executive` | **Full** | **Locked out** | Non | Non |
+| `sales` | **Full** | admin group | Non | Non |
+| `client` | 3 pages | **Locked out** | Non | Non |
+| `packer` | None | packer group | Non | Only as team lead |
+
+Two consequences sont vérifié depuis source, ne speculation:
+
+:::danger `executive` cannot use Mobile at all
+
+`executive` receives full access vers every page de `website`, et est ne handled
+par any Mobile branch. Mobile's entry route sends unrecognised rôles vers
+`/auth/login`, et le admin layout renders "Access denied. Redirecting…". An
+executive utilisateur therefore cannot ouverte le field application.
+
+This matters parce que `executive` est one de le rôle names that internal documents
+list as **live**, while `director` — which both Mobile et le Edge Function
+depend on — est **ne** on that list.
+
+:::
+
+:::warning `director` does ne exist live
+
+Live verification confirmed non `director` rôle row. Utilisateur creation via le Edge
+Fonction therefore works pour `admin` only, et attendance management reduces vers
+`admin` plus per-order team leads. Nothing dans source fails loudly — le checks
+simply never match.
+
+:::
+
+## Permission flags sont database-side only {#permission-flags-are-database-side-only}
+
+le `roles` table carries six booleans:
+
+```text
+can_manage_roles      can_ban_users        can_block_users
+can_delete_profiles   can_reset_passwords  can_unblock_users
+```
+
+A `user_effective_permissions` view exists, as do `user_has_permission` et
+`get_user_role` fonctions.
+
+**Non autorisation decision dans either application, ou dans le Edge Function, lit
+any de them.** Every check compares rôle names. le Edge Function even selects
+`can_manage_roles` alongside le rôle name et then ignores it.
+
+Live RLS does enforce some flags through `user_has_permission`, so le flags sont
+ne inert. They still do **ne** correspond vers le page-level access model.
+There sont non page-access flags dans le base de données, so page access est purely a
+frontend concern.
+
+## Temporary privileges {#temporary-privileges}
+
+`temporary_privileges` holds `user_id`, `granted_role_id`, `granted_by`,
+`expires_at`, `is_active` et `reason`. A `deactivate_expired_privileges`
+fonction exists et **non application calls it**, which implies a trigger ou
+scheduled job.
+
+Time-boxed rôle elevation est therefore part de le base de données autorisation design.
+Live verification found zero temporary privilege rows on 2026-08-20.
+
+## Rules pour working avec rôles {#rules-for-working-with-roles}
+
+Until le rôle model est unified:
+
+1. **Do ne infer access depuis a rôle name.** Check all four enforcement points.
+2. **Do ne add a rôle** without deciding its behaviour dans all four.
+3. **Do ne rename ou remove a rôle.** Four hardcoded lists depend on le strings,
+   et nothing va fail at compile time.
+4. **Do ne use permission flags pour page access** until le frontend model est designed.
+5. **Do ne treat `team_lead` as a rôle.** It est per-order state.
+
+## What would resolve this {#what-would-resolve-this}
+
+le live rôle set est now connu. What remains est a design decision: one partagé
+definition de rôle capability, avec le other layers derived depuis it rather than
+restating it.
+

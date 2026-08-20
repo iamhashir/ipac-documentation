@@ -1,0 +1,98 @@
+---
+title: "Checklist تأثير cross-app"
+sidebar_label: "Checklist التأثير"
+description: "Checklist قبل تعديل سطح مشترك."
+---
+
+# Cross-application impact checklist {#cross-application-impact-checklist}
+
+ال backend هو مشترك. This checklist exists so that a change made لـ one
+التطبيق does لا silently break ال other.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['website:docs/DEVELOPMENT.md', 'website:docs/ARCHITECTURE.md']}>
+  Derived من `website`'s own work order و architectural principles,
+  restructured as a checklist. It adds no new claims about ال system.
+</Status>
+
+## عندما إلى use it {#when-to-use-it}
+
+Any time your change touches a مشترك object:
+
+- a table, column, أو view
+- a row level الأمان policy
+- a قاعدة البيانات function, RPC, أو trigger
+- المصادقة أو session behaviour
+- a Storage bucket أو its contents
+- an edge function
+
+إذا your change هو confined إلى one التطبيق components و styling, you do لا
+need this. إذا you هي unsure, you do.
+
+## ال checklist {#the-checklist}
+
+**1. Identify every backend object you هي touching.** Name ال tables, views,
+functions, policies, triggers و buckets explicitly. إذا you cannot list them,
+you do لا yet know what your change does.
+
+**2. Search both التطبيقات لـ each object.** لا just ال one you هي working
+في. A table name, function name أو bucket name مستخدم في ال other التطبيق
+يعني your change reaches it.
+
+**3. Inspect ال triggers on those tables قبل changing any mutation.** Check
+ال functions they call. See
+[Trigger-driven behaviour](./trigger-driven-behaviour).
+
+**4. Check ال row level الأمان policies.** Ask what changes لـ each kind من
+مستخدم, في both التطبيقات. Policies هي ال real التفويض boundary;
+frontend guards هي لا.
+
+**5. Check whether business logic already lives في ال قاعدة البيانات.** إذا a rule هو
+enforced بواسطة a constraint, function أو trigger, do لا reimplement it في a client.
+
+**6. Consider both mobile interfaces.** `Mobile` has separate
+administrative و packer interfaces لـ مختلف form factors. A مشترك
+component change affects both.
+
+**7. Consider ال client portal.** `website` serves external client views
+من ال نفس النشر و ال نفس policy set. Widening a policy يمكن widen
+client-visible data.
+
+**8. Check both migration directories.** Schema history هو split across ال two
+التطبيق المستودعات; neither هو complete on its own.
+
+**9. Make ال smallest practical change**, then validate. لـ `website`:
+typecheck, build, test, lint. لـ `Mobile`, تحقق on a device — there
+هي no equivalent scripts.
+
+**10. State ال cross-application impact في your pull request.** Explicitly:
+which screens و workflows هي affected في each التطبيق, و what قاعدة البيانات
+impact ال change has. إذا ال answer هو "none", say why you هي confident.
+
+## Escalate rather than guess {#escalate-rather-than-guess}
+
+Stop و ask, أو record an [مفتوح question](/docs/reference/open-questions), عندما:
+
+- ال change depends on which role يمكن do something — ال live role set هو
+  contradicted across المصادر
+  ([OQ-002](/docs/reference/open-questions#oq-002))
+- you cannot tell whether a mobile administrative screen هو الحالي أو legacy
+- documentation و code disagree about a table name أو existence
+  ([OQ-007](/docs/reference/open-questions#oq-007))
+- ال change would need a service-role key anywhere near a client
+
+## ال underlying principles {#the-underlying-principles}
+
+من ال الموجود الهندسة document, و still ال right instincts:
+
+1. تحقق الحالي code و ال قاعدة البيانات قبل trusting older documentation.
+2. Treat Supabase as مشترك infrastructure.
+3. Check both التطبيقات قبل changing مشترك tables, RPCs, policies, auth,
+   أو Storage.
+4. Keep package definitions, overviews, instances و packed items distinct.
+5. Treat role names as technical details, لا business truth.
+6. Expect قاعدة البيانات triggers إلى change state indirectly.
+7. Prefer small, focused changes مع validation.
+

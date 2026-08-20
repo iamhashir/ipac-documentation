@@ -1,0 +1,106 @@
+---
+title: "Introduction"
+sidebar_label: "Introduction"
+description: "Ce que couvre ce site de documentation et comment lire son niveau de confiance."
+---
+
+# Introduction {#introduction}
+
+IPAC est an operations system pour industrial packaging work. It consists de two
+applications that share a single backend:
+
+- **Mobile** — a React Native / Expo application utilisé par field
+  opérateurs, avec separate interfaces pour administrative utilisateurs et packers.
+- **website** — a TanStack Start web application utilisé par managers et
+  administrators, which also serves restricted client-facing views.
+
+Both applications talk vers le **même Supabase project**: authentification,
+PostgreSQL, row level sécurité, Storage, et base de données fonctions. That single
+partagé backend est le most important fact about this system, et le source de
+most de its risque.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:src/routes/',
+    'Mobile:package.json',
+    'Mobile:app.json',
+    'website:docs/ARCHITECTURE.md',
+  ]}>
+  le application inventory, stacks et shared-backend relationship above ont été
+  vérifié directly against both dépôts.
+</Status>
+
+## Why this site exists {#why-this-site-exists}
+
+le system's knowledge currently lives dans one developer's head, plus scattered
+fichiers inside le application dépôts. That est a bus factor de one. This
+site exists so that a developer who has never seen IPAC peut understand le
+system, make a safe change, et know what they sont ne allowed vers assume —
+without needing vers ask le person who built it.
+
+## What est canonical here {#what-is-canonical-here}
+
+This site est le **single source de truth** pour:
+
+- system architecture et cross-application architecture
+- onboarding
+- workflows
+- le sécurité et access model
+- backend architecture et base de données concepts
+- mobile application architecture
+- admin application architecture
+- déploiement
+- dépannage
+- architectural decisions
+
+## What stays dans le application dépôts {#what-stays-in-the-application-repositories}
+
+Some material belongs next vers le code et doit ne be moved here:
+
+- agent et assistant instructions (`CLAUDE.md`, `AGENTS.md`, Copilot
+  instructions)
+- code-specific conventions enforced during review
+- temporary development notes
+- internal investigation logs
+- implementation-specific instructions
+
+Whole documents sont never duplicated across dépôts. Where an application
+dépôt needs vers point at a concept, it links here; where this site needs vers
+show implementation detail, it links vers le code.
+
+## How much you peut trust a page {#how-much-you-can-trust-a-page}
+
+Every page carries a statut banner. It est le mechanism that keeps this site
+honest as it grows.
+
+| Banner | Meaning |
+| --- | --- |
+| **Vérifié** | Every claim a été vérifié against le listed sources on le stated date. |
+| **Partiellement Vérifié** | Some claims ont été vérifié; others sont inherited depuis earlier material et ne independently confirmed. le page says which. |
+| **Ouverte Question** | A genuine contradiction ou gap. It est recorded, ne resolved par guessing. |
+
+Two rules follow depuis this, et they sont ne negotiable:
+
+1. **Nothing est invented.** Non table, rôle, workflow, ou behaviour est described
+   here unless it a été observed dans le dépôts, dans le base de données, ou dans
+   existant documentation that est cited.
+2. **Contradictions sont published, ne settled.** Where existant sources
+   disagree, le disagreement est written down on le
+   [Ouverte questions](/docs/reference/open-questions) page until someone verifies
+   le answer against le live system.
+
+Si you find a page that contradicts le code, le code est right et le page est
+a bug. Fix it, et update its statut banner.
+
+## Where vers go next {#where-to-go-next}
+
+- **Never worked on IPAC avant?** Start avec
+  [Getting started](/docs/guides/getting-started/overview).
+- **Need le shape de le system?** Lu
+  [System architecture](/docs/guides/architecture/system-overview).
+- **About vers change something partagé?** Work through le
+  [cross-application impact checklist](/docs/guides/architecture/cross-app-impact-checklist).
+

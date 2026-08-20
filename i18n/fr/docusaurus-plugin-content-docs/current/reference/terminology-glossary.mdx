@@ -1,0 +1,55 @@
+---
+title: "Glossaire terminologique"
+sidebar_label: "Glossaire"
+description: "Traductions standardisées et termes techniques non traduits."
+---
+
+# Terminology glossary {#terminology-glossary}
+
+<Status type="verified" date="2026-08-20">
+  This glossary defines translation handling pour repeated terms. It does ne
+  assert application behavior.
+</Status>
+
+English remains le source language. French et Arabic translations devrait
+translate explanatory prose, but keep identifiers et product names stable quand
+translation would create ambiguity.
+
+## Do ne translate {#do-not-translate}
+
+| Term | Reason |
+| --- | --- |
+| Supabase | Product name et dépôt/source references. |
+| RLS | Standard abbreviation pour row level sécurité dans Supabase/PostgreSQL context. |
+| RPC | Base de données/API mechanism name utilisé dans code et docs. |
+| React Native | Framework name. |
+| TanStack Start | Framework name. |
+| Vercel | Product name. |
+| PostgreSQL | Product name. |
+| Edge Function | Supabase product/API term. |
+| Storage | Supabase product/API term. |
+| Auth | Supabase product/API term. |
+| Node.js | Runtime name. |
+| Mobile | Dépôt/application name. |
+| website | Dépôt/application name. |
+| ipac-documentation | Dépôt name. |
+
+## Translate around terms {#translate-around-terms}
+
+Use translated prose around stable technical terms:
+
+| English pattern | French pattern | Arabic pattern |
+| --- | --- | --- |
+| partagé backend | backend partagé | backend مشترك |
+| sécurité model | modèle de sécurité | نموذج الأمان |
+| system architecture | architecture système | هندسة النظام |
+| dépannage | dépannage | استكشاف الأخطاء |
+| déploiement | déploiement | النشر |
+| authentification | authentification | المصادقة |
+
+## Keep technical strings LTR {#keep-technical-strings-ltr}
+
+Commandes, code, SQL, fichier chemins, URLs, commit hashes, table names, fonction
+names, environnement variable names et package names doit remain LTR dans every
+locale.
+

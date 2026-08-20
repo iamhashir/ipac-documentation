@@ -1,0 +1,173 @@
+---
+title: "ADR-0002: ترحيل المستودعات"
+sidebar_label: "ADR-0002"
+description: "كيفية التعامل مع أسماء المستودعات التاريخية والمعرفات الحالية."
+---
+
+# ADR-0002 — المستودع و organisation migration {#adr-0002-repository-and-organisation-migration}
+
+```text
+Status:              Accepted
+Date:                Between 2026-06-05 and 2026-08-19 (exact date Not recorded)
+Decision owners:     Not recorded
+Evidence confidence: HIGH for what changed · NONE for why it changed
+```
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:git remote / git log',
+    'Mobile:git remote / git log',
+    'website:package.json',
+    'Mobile:app.json',
+  ]}>
+  ال المستودع moves هي تم التحقق من git metadata في both checkouts. ال
+  **organisation تم confirmed بواسطة decision on 2026-08-19**, closing OQ-010. ال
+  *reason* لـ ال migration هو recorded nowhere و هو deliberately left as
+  "لا recorded".
+</Status>
+
+## Context {#context}
+
+IPAC's المستودعات have been renamed و moved at least once, و ال old names
+remain visible في git history, في prose inside ال التطبيقات, و في build
+identifiers. قبل this تم established, المصدر references في this documentation
+could لا be trusted إلى resolve.
+
+## Problem {#problem}
+
+Three مختلف owners appeared في ال available الدليل, و old GitHub URLs
+**redirect** rather than 404 — so a stale remote keeps working و gives no signal
+that it هو stale. Without a decision, every المصدر link on this site تم a guess.
+
+## Decision {#decision}
+
+**ال canonical organisation هو `ipacapps`.** Confirmed 2026-08-19.
+
+ال canonical المستودعات:
+
+```text
+ipacapps/
+├── ipac-documentation
+├── website          (formerly it-ipac/admin-panel)
+└── Mobile
+```
+
+Applied في this المستودع: `organizationName` و all three المستودع URLs في
+`docusaurus.config.ts` now use `ipacapps`, و `SourceRef` resolves both التطبيق
+المستودعات إلى live links.
+
+## Alternatives {#alternatives}
+
+**لا recorded.**
+
+No artifact evaluates keeping ال المستودعات under `it-ipac`, أو consolidating them
+differently. ال rename من `admin-panel` إلى `website` و ال organisation change
+هي visible only as outcomes.
+
+## Consequences {#consequences}
+
+### Positive {#positive}
+
+- **المصدر references resolve.** Every `SourceRef` on this site links إلى real code.
+  قبل this decision, `Mobile` مسارات rendered as plain text لأن inventing a URL
+  تم لا acceptable.
+- **One place إلى change.** المستودع URLs live في `customFields.repositories` في
+  `docusaurus.config.ts`. إذا ال organisation changes again, one edit updates every
+  link on ال site.
+- **`Mobile` هو في an organisation, لا a personal account.** An earlier checkout من
+  ال نفس التطبيق had `origin` و `upstream` pointing at two *personal*
+  accounts. That تم ال single largest bus-factor الخطر identified في ال audit, و
+  ال الحالي remote resolves it.
+- **Two مفتوح أسئلة closed** — OQ-001 و OQ-010.
+
+### Negative {#negative}
+
+- **Old names persist في three places**, و they سوف keep confusing readers:
+
+  | Location | Still says |
+  | --- | --- |
+  | `website/docs/ARCHITECTURE.md`, `DEVELOPMENT.md`, `ROLES.md` | `admin-panel/` و `ipac_mobile/` |
+  | `Mobile/README.md` | a personal-account clone URL و `cd ipac-operations-app` |
+  | `website/package.json` | `"name": "ipac-admin-panel"` |
+  | `Mobile/app.json` | `slug` و `scheme` من `ipac-operations-app`; Android package `com.ipacoperationsapp.app` |
+
+- **`ipac_mobile` never existed as a directory.** It appears في `website`'s own
+  documents, including a workspace-layout diagram, و would fail a new developer's
+  first `cd`.
+- **ال reason هو lost.** Nobody reading this سوف know whether ال move تم
+  organisational, administrative, أو incidental.
+
+### المخاطر {#risks}
+
+- **Silent link rot.** لأن GitHub redirects old URLs, a wrong organisation name
+  produces links that *work* — so ال error هو invisible until ال redirect stops.
+  This هو why ال organisation هو stated as a decision here rather than inferred.
+- **`ipac-documentation` هو unverified.** It هو configured as
+  `ipacapps/ipac-documentation` لـ consistency, but ال المستودع does لا exist
+  yet, so no remote confirms it.
+
+:::danger Load-bearing identifiers يجب لا be renamed automatically
+
+`Mobile/app.json` still declares names derived من `ipac-operations-app`. **Do لا
+"finish" ال rename بواسطة changing them.** They هي لا cosmetic:
+
+| Identifier | Value | Why renaming هو a product decision |
+| --- | --- | --- |
+| `android.package` | `com.ipacoperationsapp.app` | This **هو** ال installed التطبيق identity. Change it و you ship a *مختلف app*: الموجود installs سوف لا upgrade, و any store listing identity هو lost. |
+| `scheme` | `ipac-operations-app` | Backs deep links. Changing it breaks every link already issued. |
+| `slug` | `ipac-operations-app` | Ties ال project إلى its EAS identity, و EAS owns version numbering (`appVersionSource: "remote"`). |
+
+ال distinction that matters: **prose names هي simply wrong و ينبغي be corrected;
+build identifiers هي correct as they stand و carry migration consequences.** This
+documentation corrected ال prose on its own pages و did لا touch either
+التطبيق. Tracked as [OQ-003](/docs/reference/open-questions#oq-003).
+
+:::
+
+## الحالي State {#current-state}
+
+**في effect.** Both التطبيق checkouts have exactly one remote each, under
+`ipacapps`. No `it-ipac` remote هو configured في either.
+
+Remaining work هو في ال التطبيق المستودعات, لا here: correcting ال stale
+prose names, و separately deciding whether ال `app.json` identifiers ينبغي ever
+change.
+
+## الدليل {#evidence}
+
+| Claim | المصدر | Confidence |
+| --- | --- | --- |
+| `website` origin هو `github.com/ipacapps/website.git` | `git remote -v` | تم التحقق |
+| `Mobile` origin هو `github.com/ipacapps/Mobile.git` | `git remote -v` | تم التحقق |
+| No `it-ipac` remote configured في either | `git config --list` | تم التحقق |
+| `website` تم formerly `it-ipac/admin-panel` | merge commit `e49f426`, 2026-06-05 — `Merge branch 'main' of https://github.com/it-ipac/admin-panel` | تم التحقق |
+| `it-ipac` تم a *head*, لا ال base | merge commit `74283ee`, 2026-06-29 — `Merge pull request #1 from it-ipac/...` | تم التحقق |
+| An earlier `Mobile` checkout مستخدم two personal-account remotes | `git remote -v` on ال superseded checkout | تم التحقق |
+| `Mobile` PR #1 came من a personal account | merge commit `b327b43` | تم التحقق |
+| Package name still `ipac-admin-panel` | `website/package.json` | تم التحقق |
+| Build identifiers still derive من ال old name | `Mobile/app.json` | تم التحقق |
+| Exact migration date | — | **لا recorded** — bounded إلى بعد 2026-06-05 |
+| Reason لـ ال migration | — | **لا recorded** |
+| Whether `it-ipac` تم a rename, a transfer, أو a fork | — | **لا recorded**; محلي git metadata cannot distinguish these |
+| Who decided | — | **لا recorded** |
+
+Note ال ordering constraint: `e49f426` (2026-06-05) merges *من* `it-ipac/admin-panel`
+into what هو now `ipacapps/website`, so ال المستودع still related إلى `it-ipac` at
+that date. ال move therefore happened بعد 2026-06-05 و تم complete بواسطة ال time
+ال checkouts تم taken.
+
+## Related Documentation {#related-documentation}
+
+- [Repositories](/docs/guides/getting-started/repositories) — ال canonical set و ال historical names
+- [Build و release](/docs/mobile/build-and-release#android-identifiers) — ال identifier تحذير في operational context
+- [Documentation status](/docs/reference/documentation-status) — how `SourceRef` resolves المستودعات
+- [ADR-0001 — Web التطبيق framework](./adr-0001-website-framework) — why `website` exists at all
+
+## مفتوح أسئلة {#open-questions}
+
+- [OQ-003](/docs/reference/open-questions#oq-003) — closed as إلى *what* ال names هي; ال follow-ups (correcting التطبيق prose, و deciding on ال `app.json` identifiers) هي لا documentation tasks.
+- [OQ-010](/docs/reference/open-questions#oq-010) — closed. One residual: `ipacapps/ipac-documentation` هو assumed, لا confirmed, لأن ال المستودع does لا exist yet.
+- **Why did ال migration happen?** Unlikely إلى be recoverable من artifacts. إذا anyone remembers, it belongs في this ADR.
+

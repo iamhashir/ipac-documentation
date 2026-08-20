@@ -1,0 +1,26 @@
+---
+title: État de la documentation
+sidebar_label: État de la documentation
+description: Comment les statuts de vérification sont calculés et lus.
+---
+
+<header>
+# État de la documentation
+</header>
+
+<Status type="verified" date="2026-08-19">
+  Les compteurs restent générés depuis la documentation anglaise source.
+</Status>
+
+Les compteurs de statut ne sont pas maintenus séparément par locale. Le script `scripts/generate-doc-status.mjs` lit les pages sources dans `docs/` et génère une seule vérité dans `src/generated/documentationStatus.ts`.
+
+## Signification
+
+| Statut | Sens |
+| --- | --- |
+| Verified | Les affirmations ont été vérifiées contre les sources indiquées. |
+| Partial | Une partie est vérifiée; les limites sont indiquées. |
+| Open Question | Une contradiction ou lacune connue reste ouverte. |
+
+Les traductions ne doivent pas modifier les nombres générés.
+

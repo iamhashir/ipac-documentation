@@ -1,0 +1,551 @@
+---
+title: "أسئلة مفتوحة"
+sidebar_label: "أسئلة مفتوحة"
+description: "تناقضات وفجوات معروفة تحتاج إلى تحقق."
+---
+
+# مفتوح أسئلة {#open-questions}
+
+This هو ال register من everything ال documentation **does لا know**, plus ال
+entries that have since been answered من المصدر.
+
+<Status type="open-question" date="2026-08-19">
+  Nothing on this page هو a recommendation أو a guess. Each مفتوح entry states ال
+  conflicting الدليل و what would settle it. Do لا implement against an مفتوح
+  سؤال; resolve it first. Entries marked **Closed** تم answered من المصدر
+  و هي kept as ال record.
+</Status>
+
+## مفتوح register {#open-register}
+
+| ID | سؤال | Impact |
+| --- | --- | --- |
+| [OQ-004](#oq-004) | هو ال `.docs/` reference set و worklog protocol still في force? | Medium |
+| [OQ-006](#oq-006) | Which Node version هو officially supported? | Medium |
+| [OQ-009](#oq-009) | Who may access this documentation site, و on what domain? | Medium |
+| [OQ-011](#oq-011) | Where ينبغي قاعدة البيانات migrations live, و how do we baseline? | High |
+| [OQ-012](#oq-012) | What هي ال legal order الحالة values و transitions? | High |
+| [OQ-013](#oq-013) | What هي ال 24 uncalled قاعدة البيانات functions لـ? | Medium |
+| [OQ-017](#oq-017) | هو phone/SMS المصادقة enabled في ال project? | Medium |
+| [OQ-018](#oq-018) | What هو ال actual Mobile release و distribution process? | Medium |
+| [OQ-019](#oq-019) | هو `audit_log` a complete record من مستخدم creation? | Medium |
+| [OQ-021](#oq-021) | Which attendance capability function هو authoritative? | Medium |
+| [OQ-022](#oq-022) | What هو ال difference between `unpause_task` و `resume_task`? | Low |
+| [OQ-023](#oq-023) | What keeps `packer_sessions` denormalised fields fresh? | Low |
+
+## Closed register {#closed-register}
+
+| ID | سؤال | Closed |
+| --- | --- | --- |
+| [OQ-001](#oq-001) | Which mobile المستودع هو canonical? | 2026-08-19 |
+| [OQ-002](#oq-002) | What هو ال live role set, و هو there a hierarchy? | 2026-08-20 |
+| [OQ-003](#oq-003) | Which names do ال التطبيق المستودعات still use? | 2026-08-19 |
+| [OQ-005](#oq-005) | Which website features هي actually unbuilt? | superseded |
+| [OQ-007](#oq-007) | `order_teams` أو `order_team_members`? | 2026-08-19 |
+| [OQ-008](#oq-008) | What هو ال الحالي live schema shape? | 2026-08-20 |
+| [OQ-010](#oq-010) | Which organisation owns ال المستودعات? | 2026-08-19 |
+| [OQ-014](#oq-014) | What هي ال live RLS policies on `packer_sessions`? | 2026-08-20 |
+| [OQ-015](#oq-015) | Does bucket `order_media` exist, و هو it public? | 2026-08-20 |
+| [OQ-016](#oq-016) | هي ال `roles` permission flags enforced anywhere? | 2026-08-20 |
+| [OQ-020](#oq-020) | How هو "one active order per packer" enforced? | 2026-08-20 |
+| [OQ-024](#oq-024) | Which تقرير packed-date logic هو live today? | 2026-08-20 |
+
+---
+
+## OQ-002 {#oq-002}
+
+### What هو ال live role set, و هو there a hierarchy? {#what-is-the-live-role-set-and-is-there-a-hierarchy}
+
+**Impact: High. الحالة: closed 2026-08-20.**
+
+**What تم observed.** المصدر references six role names: `admin`, `director`,
+`executive`, `sales`, `client`, `packer`. Four enforcement points use **مختلف
+subsets**, documented في full at
+[Roles و permissions](/docs/website/roles-and-permissions). Two internal
+documents — `website/docs/ROLES.md` و `website/AGENTS.md` — assert that ال live
+`roles.name` rows هي `admin, client, executive, packer, sales`, و that
+`director`, `project_lead`, `team_lead` و `customer` هي code-only. `AGENTS.md`
+explicitly warns against reconciling ال layers without verifying all من them.
+
+**Resolved من live Supabase.** `roles.name` rows هي `admin`, `client`,
+`executive`, `packer`, و `sales`. They هي مستخدم بواسطة 35 profiles: 4 admin,
+4 client, 1 executive, 25 packer, و 1 sales.
+
+**Why it matters.** إذا `director` does لا exist live, then مستخدم creation via ال
+Edge Function works لـ `admin` only, و attendance management reduces إلى `admin`
+plus per-order team leads — مع nothing failing loudly. Meanwhile `executive`,
+which ال documents call live, هو locked out من Mobile entirely.
+
+**Residual.** There هو no live hierarchy object. Any hierarchy remains a product
+أو code convention, لا a قاعدة البيانات primitive.
+
+---
+
+## OQ-004 {#oq-004}
+
+### هو ال `.docs/` reference set و worklog protocol still في force? {#is-the-docs-reference-set-and-worklog-protocol-still-in-force}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** `website/CLAUDE.md` instructs contributors إلى consult
+reference documents في a `.docs/` directory — data flow, قاعدة البيانات schema, query
+patterns, component الهندسة, input validation و CI/CD setup — و describes
+a **mandatory** worklog protocol requiring every completed task إلى be appended إلى
+`.docs/engineering-worklog.md`.
+
+**No `.docs/` directory exists.** Re-confirmed on 2026-08-19 against ال canonical
+`ipacapps/website` checkout, لا only ال older one. None من ال seven ملفات هي
+present.
+
+**Why it matters.** A new contributor following `CLAUDE.md` looks لـ guidance that
+هو لا there, و cannot satisfy a protocol described as mandatory. It هو also
+unclear whether those documents once existed و تم lost, أو تم never written.
+
+**Why this هو a decision, لا a lookup.** ال fact هو تم التحقق. What remains هو
+choosing whether ال worklog protocol هو still required, و whether those
+reference documents ينبغي be restored في `website` أو replaced بواسطة pages on this
+site. Until then, do لا treat ال worklog protocol as an active requirement.
+
+Note that `website/AGENTS.md` **does** contain real, الحالي governance — a
+قاعدة البيانات Safety policy و a six-step قاعدة البيانات Change Process. That هو ال material
+worth adopting; see
+[الأمان model](/docs/security/model) و
+[Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+---
+
+## OQ-006 {#oq-006}
+
+### Which Node version هو officially supported? {#which-node-version-is-officially-supported}
+
+**Impact: Medium. الحالة: مفتوح — facts resolved, decision pending.**
+
+**Resolved من المصدر.** ال active values هي:
+
+| المصدر | Version |
+| --- | --- |
+| `Mobile/.nvmrc` | 22.19.0 |
+| `ipac-documentation/.nvmrc` | 22.19.0 |
+| Vercel `ipac-documentation` project | 22.x |
+| `website/.github/workflows/pr-validation.yml` | 22.x |
+| `website/.github/workflows/ci-cd.yml` | **24.x** |
+
+`website` therefore validates pull requests on one major و builds الإنتاج on
+another — a change يمكن pass review و fail في الإنتاج. ال documentation
+المستودع و Vercel `ipac-documentation` project هي aligned on Node 22.x as من
+2026-08-20.
+
+**What remains.** Choosing one version لـ `website`. That هو a decision, لا a
+lookup. This documentation site pins 22.19.0, matching `Mobile`.
+
+---
+
+## OQ-008 {#oq-008}
+
+### What هو ال الحالي live schema shape? {#what-is-the-current-live-schema-shape}
+
+**Impact: High. الحالة: closed 2026-08-20.**
+
+**Resolved من live Supabase.** ال live project has 67 public tables, 3 views,
+83 public functions, 11 public enums و 17 non-internal triggers. Every live
+public table has RLS enabled. ال shared-table RLS matrix, Storage buckets,
+triggers و high-signal grants هي documented في
+[Live backend verification](/docs/backend/live-verification).
+
+**Residual.** Fresh generated TypeScript types still need إلى be produced و
+compared في a temporary location قبل deciding whether إلى overwrite التطبيق
+types.
+
+---
+
+## OQ-009 {#oq-009}
+
+### Who may access this documentation site, و on what domain? {#who-may-access-this-documentation-site-and-on-what-domain}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+ال site هو configured إلى be compatible مع Vercel النشر Protection —
+crawling disallowed في `static/robots.txt`, sitemap generation off. Live Vercel
+inspection on 2026-08-20 confirmed SSO protection لـ all deployments except
+custom domains, zero aliases, zero team domains, و no البيئة variables.
+
+**لا decided:** which people أو identity provider groups ينبغي be allowed, و
+whether ال placeholder `url` في `docusaurus.config.ts` ينبغي remain
+`https://ipac-documentation.vercel.app` عندما no public alias هو permitted.
+
+**What would resolve it.** Choose ال access audience و final absolute URL
+strategy, then update `url` إذا needed.
+
+---
+
+## OQ-011 {#oq-011}
+
+### Where ينبغي قاعدة البيانات migrations live, و how do we baseline? {#where-should-database-migrations-live-and-how-do-we-baseline}
+
+**Impact: High. الحالة: مفتوح — live values resolved, transitions pending.**
+
+**What تم observed.** `website` has **no `supabase/` directory**. ال only
+migration في either المستودع هو one ملف في `Mobile`. A migration named
+`prefer_instance_packed_at_in_reports` تم applied إلى ال live project و later
+reverted, و exists في **no** المستودع. A second, `add_packing_start_completion_date_modes`,
+exists only as an uncommitted ملف في an older محلي checkout.
+
+**Why it matters.** 67 live tables و 83 live functions have one migration
+between them.
+There هو no reviewable history, no revert مسار, و no way إلى create an
+البيئة that provably matches الإنتاج.
+
+**What would resolve it.** A decision on where migrations live, followed بواسطة a
+baseline dump من ال الحالي schema as a first migration. See
+[Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+---
+
+## OQ-012 {#oq-012}
+
+### What هي ال legal order الحالة values و transitions? {#what-are-the-legal-order-status-values-and-transitions}
+
+**Impact: High. الحالة: مفتوح.**
+
+**What تم observed.** `orders` has `production_status` و `commercial_status`,
+both **plain strings مع no enum و no check constraint** — ال قاعدة البيانات does لا
+constrain them. Live values on 2026-08-20 هي `completed`, `in_progress`,
+`on_hold`, `pending` لـ `production_status`, و `approved`, `draft`,
+`invoiced` لـ `commercial_status`.
+
+**Why it هو unresolved.** ال live vocabulary هو المعروف, but legal transitions هي
+asserted بواسطة no المصدر.
+
+**Why it matters.** Two التطبيقات كتابة these columns. A value one التطبيق
+does لا recognise passes silently.
+
+**What would resolve it.** A product decision on ال legal transitions. Consider
+a check constraint أو enum afterwards.
+
+---
+
+## OQ-013 {#oq-013}
+
+### What هي ال 24 uncalled قاعدة البيانات functions لـ? {#what-are-the-24-uncalled-database-functions-for}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** 24 من 49 declared functions هي called بواسطة neither
+التطبيق, listed في [قاعدة البيانات model](/docs/backend/database-model#functions).
+Two قراءة like scheduled أو trigger work — `deactivate_expired_privileges` و
+`refresh_order_pkg_overview_rollup` — و `deactivate_expired_privileges` هو ال
+only mechanism that would make `temporary_privileges` function.
+
+**Why it هو unresolved.** No المستودع يحتوي a trigger definition أو a
+scheduled-job الإعداد. Any classification would be inference.
+
+**Why it matters.** إذا these هي trigger bodies, they change state as a side
+effect من يكتب that التطبيق code appears إلى control. إذا they هي dead code,
+they هي noise that obscures ال real surface.
+
+**What would resolve it.** Dump `pg_trigger` و any scheduled jobs, then
+cross-reference.
+
+---
+
+## OQ-014 {#oq-014}
+
+### What هي ال live RLS policies on `packer_sessions`? {#what-are-the-live-rls-policies-on-packersessions}
+
+**Impact: High. الحالة: closed 2026-08-20.**
+
+**What تم observed.** ال one migration في ال المستودعات creates a
+`packer_sessions` manage policy predicated on `orders.status IN ('pending','in_progress')`.
+**`orders` has no `status` column** في ال schema snapshot, و no التطبيق code
+يقرأ one. ال migration `DROP POLICY IF EXISTS`es three policies قبل creating
+ال new ones.
+
+**Resolved من live Supabase.** ال live manage policy يستخدم
+`orders.production_status IN ('pending','in_progress')`, لا ال المفقود
+`orders.status` column. ال table has three live policies. One هو a temporary
+broad authenticated policy; that هو now a الأمان review item, لا an unanswered
+catalog سؤال.
+
+---
+
+## OQ-015 {#oq-015}
+
+### Does bucket `order_media` exist, و هو it public? {#does-bucket-ordermedia-exist-and-is-it-public}
+
+**Impact: High. الحالة: closed 2026-08-20.**
+
+**What تم observed.** `Mobile` uploads package photographs إلى bucket
+**`order_media`** و immediately calls `getPublicUrl()`. `website` يقرأ و
+يكتب bucket **`media`** في six places. Only `media` appears في ال schema
+snapshot. Filenames هي `orderPackageId/timestamp.ext`.
+
+**Resolved من live Supabase.** `order_media` does لا exist as a Storage bucket
+أو public table. Live Storage buckets هي `media` و `signatures`, و both هي
+public. ال Mobile code هو therefore misaligned مع ال live Storage model.
+
+---
+
+## OQ-016 {#oq-016}
+
+### هي ال `roles` permission flags enforced anywhere? {#are-the-roles-permission-flags-enforced-anywhere}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** `roles` carries six booleans (`can_manage_roles`,
+`can_ban_users`, `can_block_users`, `can_delete_profiles`, `can_reset_passwords`,
+`can_unblock_users`). A `user_effective_permissions` view exists, as do
+`user_has_permission` و `get_user_role`. **No التفويض مسار في either
+التطبيق أو ال Edge Function يقرأ any من them** — `create-user` even selects
+`can_manage_roles` و then ignores it.
+
+**Resolved من live Supabase.** ال flags هي enforced في قاعدة البيانات helpers و
+RLS. `roles` policies call `user_has_permission('can_manage_roles')`, و
+`profiles` policies call `user_has_permission('can_block_users')` لـ a
+`project_lead` مسار. ال live `user_effective_permissions` view also merges base
+role flags مع active temporary privileges.
+
+---
+
+## OQ-017 {#oq-017}
+
+### هو phone/SMS المصادقة enabled في ال project? {#is-phonesms-authentication-enabled-in-the-project}
+
+**Impact: Medium. الحالة: closed 2026-08-20.**
+
+**What تم observed.** `Mobile` implements `signInWithPhone` و `verifyOtp` و
+exposes both through `AuthContext`. **No screen calls them.**
+
+**Why it matters.** إذا phone auth هو enabled في ال Supabase project, it هو an
+unmonitored second entry point مع no UI و therefore no logging أو rate-limit
+review.
+
+**What would resolve it.** Check ال project's auth provider الإعداد. إذا
+disabled, delete ال code; إذا enabled, document و monitor it.
+
+---
+
+## OQ-018 {#oq-018}
+
+### What هو ال actual Mobile release و distribution process? {#what-is-the-actual-mobile-release-and-distribution-process}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** Three EAS profiles, all producing **Android APKs**;
+`appVersionSource: "remote"`; `submit.production` an empty object; **no CI
+workflow في `Mobile` at all**; no release script أو runbook. `development` و
+`preview` declare `distribution: internal`; `production` declares no distribution.
+
+**Why it هو unresolved.** Nothing في المصدر states who triggers a build, how ال
+APK reaches a device, أو whether any store هو involved. APK-only يعني Google Play
+submission هو لا possible as configured.
+
+**What would resolve it.** A description من whoever performs releases. See
+[Build و release](/docs/mobile/build-and-release#release-process).
+
+---
+
+## OQ-019 {#oq-019}
+
+### هو `audit_log` a complete record من مستخدم creation? {#is-auditlog-a-complete-record-of-user-creation}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** ال `create-user` Edge Function يكتب an `audit_log` row
+لـ every account it creates. An incident log records at least one account أنشئ
+بواسطة **مباشر SQL insert** into `auth.users`, bypassing ال function — و therefore
+its audit كتابة و its role check.
+
+**Why it matters.** إذا `audit_log` هو incomplete, it cannot be مستخدم إلى answer "who
+أنشئ this account" during an incident أو review.
+
+**What would resolve it.** Compare `auth.users` against `audit_log` entries مع
+`entity_type = 'profile'` و `action_type = 'INSERT'`.
+
+---
+
+## OQ-020 {#oq-020}
+
+### How هو "one active order per packer" enforced? {#how-is-one-active-order-per-packer-enforced}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** `profiles.current_order_id` exists.
+`update_project_lead_with_status` couples a lead change مع a الحالة change.
+`website` provides `admin_force_release_packer`, which only makes sense إذا a packer
+يمكن become stuck attached إلى an order.
+
+**Resolved من live Supabase.** `order_team_members` has an enabled trigger
+`trigger_enforce_single_active_order_for_packer` backed بواسطة function
+`enforce_single_active_order_for_packer`, plus related team-change triggers that
+sync `profiles.current_order_id` و packer الحالة.
+
+---
+
+## OQ-021 {#oq-021}
+
+### Which attendance capability function هو authoritative? {#which-attendance-capability-function-is-authoritative}
+
+**Impact: Medium. الحالة: مفتوح.**
+
+**What تم observed.** `Mobile` calls **both** `can_record_attendance` و
+`can_user_mark_attendance`. Only ال second has a body في any المستودع (من ال
+one migration). ال first هو declared في ال types snapshot مع غير معروف logic.
+
+**Why it matters.** Two capability gates on one action يمكن disagree. Removing
+either call without knowing ال difference could silently widen أو block access.
+
+**What would resolve it.** Dump both function definitions و compare.
+
+---
+
+## OQ-022 {#oq-022}
+
+### What هو ال difference between `unpause_task` و `resume_task`? {#what-is-the-difference-between-unpausetask-and-resumetask}
+
+**Impact: Low. الحالة: مفتوح.**
+
+**What تم observed.** `pause_task`, `unpause_task` و `resume_task` all exist و
+هي all called من `Mobile`. Two من them appear إلى perform ال نفس transition out
+من `paused`. No function body exists في المصدر.
+
+**What would resolve it.** Dump both definitions. إذا identical, deprecate one.
+
+---
+
+## OQ-023 {#oq-023}
+
+### What keeps `packer_sessions` denormalised fields fresh? {#what-keeps-packersessions-denormalised-fields-fresh}
+
+**Impact: Low. الحالة: مفتوح.**
+
+**What تم observed.** `packer_sessions` stores `order_name`, `client_name` و
+`project_lead_name` alongside `order_id`. These هي snapshots taken at session
+creation. Nothing في المصدر refreshes them.
+
+**Why it matters.** إذا an order هو renamed أو a project lead changes mid-session,
+ال session copies هي stale, و any UI reading them shows outdated values.
+
+**What would resolve it.** Check لـ triggers on `orders`, `profiles` و
+`packer_sessions`.
+
+---
+
+## OQ-024 {#oq-024}
+
+### Which تقرير packed-date logic هو live today? {#which-report-packed-date-logic-is-live-today}
+
+**Impact: High. الحالة: closed 2026-08-20.**
+
+**What تم observed.** An incident log records ال تقرير date logic being changed
+إلى `COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` via a
+migration named `prefer_instance_packed_at_in_reports`, و then **reverted on
+2026-08-08** إلى `MAX(pkd_item.created_at)`. A further migration named
+`add_packing_start_completion_date_modes` exists as an uncommitted ملف في an older
+checkout, implying more work followed.
+
+**Resolved من live Supabase.** ال الحالي overload مع `p_tag_ids` يستخدم
+`COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` لـ
+completion-style modes. It accepts `packing_started_at`,
+`packing_completed_at`, `item_packed_at`, و falls back إلى instance creation لـ
+unrecognised modes. `item_packed_at` هو a legacy alias لـ completion.
+
+---
+
+## OQ-001 {#oq-001}
+
+### Which mobile المستودع هو canonical? — **CLOSED 2026-08-19** {#which-mobile-repository-is-canonical-closed-2026-08-19}
+
+**Resolved من المصدر.** ال `Mobile` checkout's only configured remote هو
+`https://github.com/ipacapps/Mobile.git` — an organisation account, لا a personal
+one. ال personal-account remotes previously recorded belonged إلى an older,
+superseded checkout previously referenced as `ipac-operations-app`. مع ال
+canonical organisation confirmed (see [OQ-010](#oq-010)), ال المستودع URL هو
+established و `SourceRef` now links `Mobile` مسارات.
+
+---
+
+## OQ-003 {#oq-003}
+
+### Which names do ال التطبيق المستودعات still use? — **CLOSED 2026-08-19** {#which-names-do-the-application-repositories-still-use-closed-2026-08-19}
+
+**Resolved من المصدر.** ال المستودعات هي `website` و `Mobile`. Older names
+persist inside them, و ال distinction between ال two kinds matters:
+
+| Location | Still says | Kind |
+| --- | --- | --- |
+| `website/docs/ARCHITECTURE.md` | `admin-panel/`, `ipac_mobile/` | prose — simply wrong |
+| `website/docs/DEVELOPMENT.md` | workspace layout و `cd` commands لـ both | prose — simply wrong |
+| `website/docs/ROLES.md` | page access "في `admin-panel`" | prose — simply wrong |
+| `Mobile/README.md` | clone URL و `cd ipac-operations-app` | prose — simply wrong |
+| `Mobile/app.json` | `slug`, `scheme` = `ipac-operations-app`; `android.package` = `com.ipacoperationsapp.app` | **load-bearing — يجب لا be renamed casually** |
+
+Previously referenced as: `admin-panel` لـ `website`; `ipac-operations-app` و
+`ipac_mobile` لـ `Mobile`.
+
+**Closed لأن ال سؤال — what ال real names هي — هو answered.** Two
+follow-ups هي *لا* documentation work: correcting ال prose في ال التطبيق
+المستودعات, و deciding separately whether ال `app.json` identifiers ينبغي
+change, since they govern installed-app identity و deep links. See
+[Build و release](/docs/mobile/build-and-release#android-identifiers).
+
+---
+
+## OQ-005 {#oq-005}
+
+### Which website features هي actually unbuilt? — **SUPERSEDED** {#which-website-features-are-actually-unbuilt-superseded}
+
+ال `website` README's "Coming Soon" list هو stale: routes exist لـ all four items
+it names, plus clients, requests, data import, inventory duplicates و a client
+portal. Route existence هو لا proof من completeness, so ال original سؤال هو
+better answered بواسطة ال per-feature documentation this site سوف grow than بواسطة a
+single audit answer. Superseded بواسطة
+[website architecture](/docs/guides/architecture/website-architecture).
+
+---
+
+## OQ-007 {#oq-007}
+
+### `order_teams` أو `order_team_members`? — **CLOSED 2026-08-19** {#orderteams-or-orderteammembers-closed-2026-08-19}
+
+**Resolved من المصدر, من two independent artifacts.**
+`order_team_members` exists, مع columns `(id, order_id, packer_id, is_team_lead,
+created_at)`, declared in `website/src/types/supabase.ts` و أنشئ/altered في
+`Mobile/supabase/migrations/20250121_add_team_lead_support.sql`. It carries a
+unique constraint on `(order_id, packer_id)`, implied بواسطة an `ON CONFLICT` clause,
+و a partial index on `(order_id, packer_id) WHERE is_team_lead = TRUE`.
+
+**`order_teams` does لا exist** في any المصدر. ال `Mobile` README هو wrong.
+
+---
+
+## OQ-010 {#oq-010}
+
+### Which organisation owns ال المستودعات? — **CLOSED 2026-08-19** {#which-organisation-owns-the-repositories-closed-2026-08-19}
+
+**Confirmed: `ipacapps`.** Decided 2026-08-19, consistent مع ال الدليل:
+
+| الدليل | Points إلى |
+| --- | --- |
+| `website` `origin` remote | `github.com/ipacapps/website.git` |
+| `Mobile` `origin` remote | `github.com/ipacapps/Mobile.git` |
+| `website` merge commit `e49f426` | `Merge branch 'main' of https://github.com/it-ipac/admin-panel` — ال **former** location من `website` |
+| `website` merge commit `74283ee` | *"Merge pull request #1 من it-ipac/…"* — `it-ipac` تم ال head, لا ال base |
+
+`it-ipac/admin-panel` تم ال previous identity من what هو now `ipacapps/website`.
+`organizationName` و all المستودع URLs في `docusaurus.config.ts` now use
+`ipacapps`.
+
+**One residual assumption:** `ipac-documentation` هو configured as
+`ipacapps/ipac-documentation`, consistent مع this decision, but ال المستودع
+does لا exist yet so no remote confirms it. تحقق عندما it هو أنشئ.
+
+---
+
+## Adding an entry {#adding-an-entry}
+
+Found something ال documentation cannot settle? Add it here rather than guessing,
+و mark ال affected page مع an مفتوح سؤال الحالة banner. An entry needs five
+things: what تم observed, why it هو unresolved, why it matters, what would resolve
+it, و a stable ID so pages يمكن link إلى it. عندما an entry هو answered, move it إلى
+ال closed register مع ال date و ال الدليل — do لا delete it.
+

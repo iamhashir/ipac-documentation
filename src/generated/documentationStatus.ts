@@ -6,6 +6,7 @@ export interface DocumentationStatusEntry {
   title: string;
   type: DocumentationStatusType;
   date: string | null;
+  sources: readonly string[];
 }
 
 export const documentationStatus = [
@@ -13,247 +14,534 @@ export const documentationStatus = [
     "id": "adr/adr-0001-website-framework",
     "title": "ADR-0001 — Web application framework",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:README.md",
+      "website:package.json",
+      "website:nitro.config.ts",
+      "website:git log",
+      "Mobile:package.json",
+      "Mobile:app.json"
+    ]
   },
   {
     "id": "adr/adr-0002-repository-migration",
     "title": "ADR-0002 — Repository and organisation migration",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:git remote / git log",
+      "Mobile:git remote / git log",
+      "website:package.json",
+      "Mobile:app.json"
+    ]
   },
   {
     "id": "adr/adr-0003-report-packed-date",
     "title": "ADR-0003 — Report packed-date semantics",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:Trail/packed-date-report-conflict-log.md",
+      "website:Trail/box-snapshots-2026-08-10.json",
+      "website:src/features/reports/components/PackingListPage.tsx",
+      "website:src/features/reports/types.ts",
+      "website:inspect_rpc.js",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "adr/overview",
     "title": "Architectural decisions",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "ipac-documentation:docs/adr/"
+    ]
   },
   {
     "id": "backend/database-model",
     "title": "Database model",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/types/supabase.ts",
+      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
+      "website:inspect_rpc.js",
+      "website:inspect_instances.js",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "backend/live-verification",
     "title": "Live backend verification",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "Supabase project fqynbudvpvpiljdrrvem",
+      "Vercel project prj_JmwilDaL0qk60puwV6c44yK3HL2Y",
+      "ipac-documentation:.vercel/project.json",
+      "ipac-documentation:vercel.json",
+      "ipac-documentation:package.json",
+      "Vercel CLI deployment dpl_2jbcqvpfG4fT2ztjc7nDi2nadpJo"
+    ]
   },
   {
     "id": "backend/schema-provenance",
     "title": "Schema provenance",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/types/supabase.ts",
+      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
+      "website:Trail/packed-date-report-conflict-log.md",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "guides/architecture/cross-app-impact-checklist",
     "title": "Cross-application impact checklist",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:docs/DEVELOPMENT.md",
+      "website:docs/ARCHITECTURE.md"
+    ]
   },
   {
     "id": "guides/architecture/cross-app",
     "title": "Cross-application architecture",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/",
+      "website:server/",
+      "Mobile:app/",
+      "Mobile:components/",
+      "Mobile:utils/",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "guides/architecture/mobile-architecture",
     "title": "Mobile architecture",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:package.json",
+      "Mobile:app.json",
+      "Mobile:app/",
+      "Mobile:components/",
+      "Mobile:utils/",
+      "Mobile:supabase/",
+      "Mobile:eas.json"
+    ]
   },
   {
     "id": "guides/architecture/shared-backend-model",
     "title": "The shared backend model",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/lib/supabase.ts",
+      "Mobile:utils/api/",
+      "Mobile:app.json",
+      "website:docs/ARCHITECTURE.md",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "guides/architecture/system-overview",
     "title": "System architecture",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:package.json",
+      "website:src/routes/",
+      "website:server/api/",
+      "Mobile:app/",
+      "Mobile:package.json",
+      "website:docs/ARCHITECTURE.md",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "guides/architecture/trigger-driven-behaviour",
     "title": "Trigger-driven behaviour",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:docs/ARCHITECTURE.md",
+      "website:CLAUDE.md",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "guides/architecture/website-architecture",
     "title": "website architecture",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:package.json",
+      "website:src/routes/",
+      "website:src/",
+      "website:server/api/",
+      "website:CLAUDE.md",
+      "website:docs/ARCHITECTURE.md"
+    ]
   },
   {
     "id": "guides/getting-started/environment-variables",
     "title": "Environment variables",
     "type": "partial",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:.env.example",
+      "website:CLAUDE.md",
+      "website:.github/workflows/ci-cd.yml",
+      "Mobile:.env.example",
+      "website:docs/DEVELOPMENT.md"
+    ]
   },
   {
     "id": "guides/getting-started/first-change",
     "title": "Your first change",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:package.json",
+      "website:.github/workflows/",
+      "website:src/lib/access.ts",
+      "Mobile:package.json",
+      "Mobile:components/",
+      "website:AGENTS.md"
+    ]
   },
   {
     "id": "guides/getting-started/mobile-setup",
     "title": "Mobile setup",
     "type": "partial",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:package.json",
+      "Mobile:app.json",
+      "Mobile:eas.json",
+      "Mobile:.env.example",
+      "Mobile:README.md"
+    ]
   },
   {
     "id": "guides/getting-started/overview",
     "title": "Getting started",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:docs/DEVELOPMENT.md",
+      "Mobile:README.md"
+    ]
   },
   {
     "id": "guides/getting-started/prerequisites",
     "title": "Prerequisites",
     "type": "partial",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "Mobile:.nvmrc",
+      "Mobile:package.json",
+      "Mobile:README.md",
+      "website:package.json",
+      "website:.github/workflows/",
+      "ipac-documentation:.vercel/project.json"
+    ]
   },
   {
     "id": "guides/getting-started/repositories",
     "title": "Repositories",
     "type": "partial",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:package.json",
+      "website:.github/workflows/ci-cd.yml",
+      "Mobile:package.json",
+      "Mobile:app.json",
+      "Mobile:eas.json"
+    ]
   },
   {
     "id": "guides/getting-started/website-setup",
     "title": "website setup",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:package.json",
+      "website:.env.example",
+      "website:docs/DEVELOPMENT.md",
+      "website:CLAUDE.md"
+    ]
   },
   {
     "id": "guides/introduction",
     "title": "Introduction",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:package.json",
+      "website:src/routes/",
+      "Mobile:package.json",
+      "Mobile:app.json",
+      "website:docs/ARCHITECTURE.md"
+    ]
   },
   {
     "id": "mobile/build-and-release",
     "title": "Build and release",
     "type": "partial",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:eas.json",
+      "Mobile:app.json",
+      "Mobile:package.json",
+      "Mobile:.nvmrc",
+      "Mobile:utils/api/supabase.ts"
+    ]
   },
   {
     "id": "reference/documentation-status",
     "title": "Documentation status",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "ipac-documentation:src/components/Status/index.tsx"
+    ]
   },
   {
     "id": "reference/open-questions",
     "title": "Open questions",
     "type": "open-question",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": []
+  },
+  {
+    "id": "reference/terminology-glossary",
+    "title": "Terminology glossary",
+    "type": "verified",
+    "date": "2026-08-20",
+    "sources": []
   },
   {
     "id": "security/findings",
     "title": "Security findings",
     "type": "partial",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/routes/",
+      "website:src/middleware/auth.ts",
+      "website:inspect_rpc.js",
+      "Mobile:utils/api/supabase.ts",
+      "Mobile:app.json",
+      "Mobile:supabase/functions/create-user/index.ts",
+      "Mobile:Trail/login-hashir-1.md",
+      "website:Trail/packed-date-report-conflict-log.md",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "security/model",
     "title": "Security model",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/lib/access.ts",
+      "website:src/hooks/usePageAccess.ts",
+      "website:src/lib/supabase.ts",
+      "Mobile:app/index.tsx",
+      "Mobile:utils/AuthContext.tsx",
+      "Mobile:supabase/functions/create-user/index.ts",
+      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "troubleshooting/authentication",
     "title": "Authentication troubleshooting",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:Trail/login-hashir-1.md",
+      "Mobile:utils/api/supabase.ts",
+      "Mobile:utils/AuthContext.tsx",
+      "Mobile:app/(packer)/_layout.tsx",
+      "website:src/lib/supabase.ts"
+    ]
   },
   {
     "id": "troubleshooting/configuration",
     "title": "Configuration troubleshooting",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:utils/api/supabase.ts",
+      "Mobile:app.json",
+      "Mobile:components/debug/NetworkTest.tsx",
+      "Mobile:WARP.md",
+      "Mobile:.nvmrc",
+      "website:.github/workflows/",
+      "Mobile:supabase/functions/create-user/index.ts",
+      "website:server/api/webhooks/resend/inbound.post.ts"
+    ]
   },
   {
     "id": "troubleshooting/mobile",
     "title": "Mobile troubleshooting",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:git log",
+      "Mobile:babel.config.js",
+      "Mobile:package.json",
+      "Mobile:WARP.md",
+      "Mobile:README.md"
+    ]
   },
   {
     "id": "troubleshooting/overview",
     "title": "Troubleshooting",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:Trail/login-hashir-1.md",
+      "Mobile:git log",
+      "Mobile:babel.config.js",
+      "Mobile:WARP.md",
+      "website:.github/workflows/",
+      "website:src/lib/supabase.ts"
+    ]
   },
   {
     "id": "troubleshooting/website",
     "title": "website troubleshooting",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "website:package.json",
+      "website:biome.json",
+      "website:.github/workflows/pr-validation.yml",
+      "website:.github/workflows/ci-cd.yml",
+      "website:src/lib/supabase.ts",
+      "website:src/hooks/usePageAccess.ts",
+      "website:git log"
+    ]
   },
   {
     "id": "website/roles-and-permissions",
     "title": "Roles and permissions",
     "type": "partial",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "website:src/lib/access.ts",
+      "website:src/hooks/usePageAccess.ts",
+      "Mobile:app/index.tsx",
+      "Mobile:app/(admin)/_layout.tsx",
+      "Mobile:app/(packer)/_layout.tsx",
+      "Mobile:supabase/functions/create-user/index.ts",
+      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
+      "website:src/types/supabase.ts",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "workflows/overview",
     "title": "Workflows",
     "type": "partial",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:utils/api/supabase.ts",
+      "Mobile:utils/PackerSessionContext.tsx",
+      "Mobile:supabase/functions/create-user/index.ts",
+      "website:src/features/orders/",
+      "website:src/features/reports/",
+      "website:Trail/packed-date-report-conflict-log.md"
+    ]
   },
   {
     "id": "workflows/w1-user-provisioning",
     "title": "W1 — User provisioning",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:supabase/functions/create-user/index.ts",
+      "website:src/routes/users.tsx",
+      "Mobile:Trail/login-hashir-1.md"
+    ]
   },
   {
     "id": "workflows/w2-packer-team-assignment",
     "title": "W2 — Packer and team assignment",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:utils/api/supabase.ts",
+      "Mobile:utils/api/teamLead.ts",
+      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
+      "website:src/features/orders/"
+    ]
   },
   {
     "id": "workflows/w3-attendance",
     "title": "W3 — Attendance",
     "type": "partial",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "Mobile:utils/api/supabase.ts",
+      "Mobile:app/(packer)/attendance.tsx",
+      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
+      "website:src/components/orders/orderId/sections/AttendanceSection.tsx",
+      "website:src/components/orders/orderId/modals/AttendanceCleanerModal.tsx",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   },
   {
     "id": "workflows/w4-task-lifecycle",
     "title": "W4 — Task lifecycle",
     "type": "partial",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:utils/api/supabase.ts",
+      "website:src/types/supabase.ts",
+      "website:src/features/orders/"
+    ]
   },
   {
     "id": "workflows/w5-packer-session",
     "title": "W5 — Packer session",
     "type": "verified",
-    "date": "2026-08-19"
+    "date": "2026-08-19",
+    "sources": [
+      "Mobile:utils/PackerSessionContext.tsx",
+      "website:src/types/supabase.ts"
+    ]
   },
   {
     "id": "workflows/w6-packing-evidence",
     "title": "W6 — Packing evidence and report dates",
     "type": "verified",
-    "date": "2026-08-20"
+    "date": "2026-08-20",
+    "sources": [
+      "Mobile:utils/api/supabase.ts",
+      "website:Trail/packed-date-report-conflict-log.md",
+      "website:inspect_rpc.js",
+      "website:inspect_instances.js",
+      "website:src/features/reports/",
+      "Supabase project fqynbudvpvpiljdrrvem"
+    ]
   }
 ] as const satisfies readonly DocumentationStatusEntry[];
 
 export const documentationStatusSummary = {
-  total: 40,
-  verified: 29,
+  total: 41,
+  verified: 30,
+  verifiedLive: 18,
+  verifiedSource: 12,
   partial: 10,
   openQuestion: 1,
   latestLiveBackendVerification: "2026-08-20",

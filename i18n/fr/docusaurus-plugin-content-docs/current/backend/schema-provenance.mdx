@@ -1,0 +1,133 @@
+---
+title: "Provenance du schéma"
+sidebar_label: "Provenance du schéma"
+description: "Origine des informations de schéma utilisées dans la documentation."
+---
+
+# Schema provenance {#schema-provenance}
+
+**Lu this avant trusting any schema fact on this site.**
+
+IPAC's base de données est ne defined par its dépôts. It est defined par le live
+Supabase project, et le dépôts contain only partial, dated echoes de it.
+This page states exactly what those echoes sont et how far each peut be trusted.
+
+<Status
+  type="verified"
+  date="2026-08-20"
+  sources={[
+    'website:src/types/supabase.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'website:Trail/packed-date-report-conflict-log.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  Dépôt artifacts ont été lu directly et compared avec read-only live
+  Supabase catalog results. Actuel live counts et policy summaries sont kept dans
+  [Live backend verification](./live-verification).
+</Status>
+
+## le three sources, ranked {#the-three-sources-ranked}
+
+### 1. Generated types — broad but stale {#1-generated-types-broad-but-stale}
+
+<SourceRef repo="website" path="src/types/supabase.ts" /> is a generated
+Supabase types fichier de 4,218 lines. It est le single most informative schema
+artifact dans either dépôt, declaring **63 tables, 3 views, 49 fonctions,
+8 enums et 188 foreign keys** avec exact column types et nullability.
+
+**It est provably out de date.** Live Supabase now rapports 67 public tables, 83
+public fonctions et 11 enums. Application code references base de données objects that
+le fichier does ne declare:
+
+| Manquant depuis le types fichier | Utilisé par |
+| --- | --- |
+| `order_item_allocation`, `destinations`, `allocation_increase_requests`, `signatures` | `website` |
+| `order_media` | `Mobile` |
+| `add_order_item_allocation`, `apply_order_item_allocations`, `upsert_order_item_allocation`, `set_allocation_expected`, `approve_allocation_increase_request`, `reject_allocation_increase_request`, `fetch_report_instances`, `fetch_instance_items` | `website` |
+
+le allocation subsystem post-dates le snapshot et est live, except pour
+`order_media`, which a été ne found as a live table ou Storage bucket. le
+reporting RPC that `website` depends on has live overloads absent depuis le
+snapshot. le fichier carries non generation date, et nothing dans either dépôt
+records quand it a été produced ou par whom.
+
+**How vers treat it:** as a lower bound on what exists, never as a description de
+what exists now. A table dans le fichier almost certainly exists; a table absent
+depuis le fichier may well exist too.
+
+### 2. le one migration — narrow but exact {#2-the-one-migration-narrow-but-exact}
+
+<SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" />
+est le **only** migration fichier dans either dépôt. It est exact et complete
+pour what it touches: one column, one index, three `SECURITY DEFINER` fonctions
+avec their bodies et grants, et explicit RLS policies pour two tables.
+
+It est also le only place dans any dépôt where an RLS policy est written down.
+
+### 3. Trail logs — narrative, et le only record de some changes {#3-trail-logs-narrative-and-the-only-record-of-some-changes}
+
+`website/Trail/` et `Mobile/Trail/` sont incident logs. They sont prose, ne
+schema, but they record base de données changes that exist nowhere else — including a
+named migration applied vers production et later reverted.
+
+## le base de données est ne reproducible depuis le dépôts {#the-database-is-not-reproducible-from-the-repositories}
+
+This est le central fact, et it est ne a suspicion — it est documented.
+
+<Status type="verified" date="2026-08-19"
+  sources={['website:Trail/packed-date-report-conflict-log.md']}>
+  A migration named `prefer_instance_packed_at_in_reports` a été applied vers le
+  live project, replacing le body de le `fetch_report_instances` RPC, et a été
+  later reverted. **Neither le migration nor its revert exists dans any
+  dépôt.** le log est le only record — see
+  [ADR-0003](/docs/adr/adr-0003-report-packed-date).
+</Status>
+
+Consequences, stated plainly:
+
+- **There est non reviewable history.** 67 tables et 83 fonctions have one
+  migration between them. You cannot diff a schema change, et you cannot see
+  who changed what quand.
+- **There est non revert chemin.** Reverting le change above meant manually
+  reapplying le previous fonction body depuis memory ou depuis le log.
+- **A fresh environnement cannot be créé.** There est non sequence de fichiers that
+  produces this base de données, so there est non staging environnement that provably
+  matches production, et non local base de données at all.
+- **`website` has non `supabase/` directory whatsoever.** Every schema change
+  made pour le web application est unversioned.
+
+A second instance de le même pattern: a migration fichier named
+`add_packing_start_completion_date_modes` exists as an **uncommitted** fichier dans
+an older local checkout. It a été never committed vers any dépôt.
+
+## What this signifie pour reading these docs {#what-this-means-for-reading-these-docs}
+
+Pages on this site use three statut labels, et on backend topics they mean
+something specific:
+
+| Label | On a backend page it signifie |
+| --- | --- |
+| **Vérifié** | Lu directly depuis a dépôt fichier — le types snapshot, le migration, ou application code. le claim est about what le source says. |
+| **Partiellement Vérifié** | Part de le claim comes depuis source; part est inherited depuis prose that a été ne re-checked. |
+| **Requires live base de données verification** | Source cannot answer this. Do ne act on an assumption here. |
+
+Anything about **triggers, RLS on le other ~61 tables, Storage bucket
+configuration, grants, ou actuel object counts** falls into le third category.
+Non dépôt contient that information.
+
+## Restoring reproducibility {#restoring-reproducibility}
+
+Ne a documentation task, but le documentation cannot become trustworthy
+without it. le minimum viable change:
+
+1. **Adopt a migrations directory pour `website`.** It has none.
+2. **Author changes as migration fichiers first**, then apply them — rather than
+   applying them vers le live project et naming them afterwards.
+3. **Baseline le actuel schema** par dumping it into a first migration, so
+   subsequent diffs mean something.
+4. **Regenerate le types fichier as part de that baseline**, et record le date.
+
+Until at least steps 1 et 4 happen, every backend page here has a shelf life
+measured dans weeks. Tracked as
+[OQ-011](/docs/reference/open-questions#oq-011).
+

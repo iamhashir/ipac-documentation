@@ -1,6 +1,6 @@
 .status {
   border: 1px solid var(--ipac-border);
-  border-left-width: 4px;
+  border-inline-start-width: 4px;
   border-radius: 6px;
   background: var(--ipac-surface-raised);
   padding: 0.95rem 1rem;
@@ -11,19 +11,19 @@
 
 .status--verified,
 .status--verified-source {
-  border-left-color: var(--ifm-color-success);
+  border-inline-start-color: var(--ifm-color-success);
 }
 
 .status--verified-live {
-  border-left-color: var(--ifm-color-primary);
+  border-inline-start-color: var(--ifm-color-primary);
 }
 
 .status--partial {
-  border-left-color: var(--ifm-color-warning);
+  border-inline-start-color: var(--ifm-color-warning);
 }
 
 .status--open-question {
-  border-left-color: var(--ipac-accent);
+  border-inline-start-color: var(--ipac-accent);
   background: var(--ipac-accent-soft);
 }
 
@@ -61,6 +61,32 @@
   font-size: 0.84rem;
 }
 
+.metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.75rem;
+  margin: 0.7rem 0 0;
+}
+
+.metadata div {
+  min-width: 0;
+}
+
+.metadata dt {
+  color: var(--ipac-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.metadata dd {
+  margin: 0.08rem 0 0;
+  direction: ltr;
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+  font-size: 0.84rem;
+}
+
 .body {
   margin-top: 0.5rem;
 }
@@ -94,7 +120,15 @@
 }
 
 .sourcesList code {
+  direction: ltr;
+  unicode-bidi: isolate;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+@media (max-width: 560px) {
+  .metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

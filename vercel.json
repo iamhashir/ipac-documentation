@@ -4,5 +4,17 @@
   "installCommand": "npm ci",
   "outputDirectory": "build",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/en",
+      "permanent": false
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "/en/docs/:path*",
+      "permanent": false
+    }
+  ]
 }

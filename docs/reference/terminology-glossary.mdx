@@ -1,0 +1,54 @@
+---
+title: Terminology glossary
+sidebar_label: Terminology glossary
+description: Translation rules for repeated IPAC technical terms.
+---
+
+# Terminology glossary
+
+<Status type="verified" date="2026-08-20">
+  This glossary defines translation handling for repeated terms. It does not
+  assert application behavior.
+</Status>
+
+English remains the source language. French and Arabic translations should
+translate explanatory prose, but keep identifiers and product names stable when
+translation would create ambiguity.
+
+## Do not translate
+
+| Term | Reason |
+| --- | --- |
+| Supabase | Product name and repository/source references. |
+| RLS | Standard abbreviation for row level security in Supabase/PostgreSQL context. |
+| RPC | Database/API mechanism name used in code and docs. |
+| React Native | Framework name. |
+| TanStack Start | Framework name. |
+| Vercel | Product name. |
+| PostgreSQL | Product name. |
+| Edge Function | Supabase product/API term. |
+| Storage | Supabase product/API term. |
+| Auth | Supabase product/API term. |
+| Node.js | Runtime name. |
+| Mobile | Repository/application name. |
+| website | Repository/application name. |
+| ipac-documentation | Repository name. |
+
+## Translate around terms
+
+Use translated prose around stable technical terms:
+
+| English pattern | French pattern | Arabic pattern |
+| --- | --- | --- |
+| shared backend | backend partagé | backend مشترك |
+| security model | modèle de sécurité | نموذج الأمان |
+| system architecture | architecture système | هندسة النظام |
+| troubleshooting | dépannage | استكشاف الأخطاء |
+| deployment | déploiement | النشر |
+| authentication | authentification | المصادقة |
+
+## Keep technical strings LTR
+
+Commands, code, SQL, file paths, URLs, commit hashes, table names, function
+names, environment variable names and package names must remain LTR in every
+locale.

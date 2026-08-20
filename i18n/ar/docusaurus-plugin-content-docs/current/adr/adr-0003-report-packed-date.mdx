@@ -1,0 +1,250 @@
+---
+title: "ADR-0003: تاريخ packed في التقرير"
+sidebar_label: "ADR-0003"
+description: "قرار مصدر الحقيقة لتاريخ packed في التقارير."
+---
+
+# ADR-0003 — تقرير packed-date semantics {#adr-0003-report-packed-date-semantics}
+
+```text
+Status:              Accepted
+Date:                2026-08-08 applied and reverted · 2026-08-11 client behaviour committed
+Decision owners:     Not recorded
+Evidence confidence: HIGH historically · VERIFIED live 2026-08-20
+```
+
+<Status
+  type="verified"
+  date="2026-08-20"
+  sources={[
+    'website:Trail/packed-date-report-conflict-log.md',
+    'website:Trail/box-snapshots-2026-08-10.json',
+    'website:src/features/reports/components/PackingListPage.tsx',
+    'website:src/features/reports/types.ts',
+    'website:inspect_rpc.js',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  ال history هو documented في detail بواسطة an incident log. ال client behaviour هو
+  تم التحقق من committed code, و ال server behaviour تم تم التحقق من ال
+  live `fetch_report_instances` function body on 2026-08-20.
+</Status>
+
+## Context {#context}
+
+A client packing list answers "which boxes تم packed, في this date range, لـ this
+destination". ال answer depends entirely on what "packed date" يعني, و there هي
+three candidate المصادر في ال schema:
+
+| Candidate | Meaning |
+| --- | --- |
+| `order_pkg_instance.packed_at` | عندما ال box تم declared packed |
+| `MAX(pkd_item.created_at)` | عندما ال last item تم recorded into ال box |
+| `task_logs.end_time` | عندما ال packing task finished |
+
+These diverge whenever a box هو reopened, reworked, أو has items added later.
+
+## Problem {#problem}
+
+تقارير تم showing dates و box counts that did لا match an operational
+source-من-truth spreadsheet لـ one client order. ال investigation هو recorded في
+<SourceRef repo="website" path="Trail/packed-date-report-conflict-log.md" />.
+
+Two distinct defects emerged:
+
+1. **ال تقرير مستخدم ال wrong date المصدر.** مع `MAX(pkd_item.created_at)`, ال
+   تقرير date moved whenever item rows تم added — so a box packed في July could
+   تقرير a June date, أو drift later بعد rework.
+2. **ال client تم destroying ال original date.** ال packing list page previously
+   wrote:
+
+   ```ts
+   packed_at: status === "packed" ? new Date().toISOString() : null
+   ```
+
+   Moving a box *away* من `packed` therefore set `packed_at` back إلى `null`,
+   discarding ال original packed date permanently.
+
+## Decision {#decision}
+
+### HISTORICALLY تم التحقق — what تم decided و applied on 2026-08-08 {#historically-verified-what-was-decided-and-applied-on-2026-08-08}
+
+**Server.** A migration named `prefer_instance_packed_at_in_reports` تم applied إلى
+ال live project, changing ال تقرير date في `fetch_report_instances` إلى:
+
+```sql
+COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))
+```
+
+replacing:
+
+```sql
+MAX(pkd_item.created_at)
+```
+
+**ال rationale, stated verbatim في ال log:**
+
+> ال migration intentionally does لا use `task_logs.end_time`, لأن
+> reopening/reworking a box ينبغي لا move ال original packed date.
+
+This هو ال only business rule في IPAC recorded together مع its reason. It هو ال
+core من this ADR: **ال packed date هو ال date a box تم *first* declared packed, و
+nothing later may move it.**
+
+**Client.** ال كتابة rule became:
+
+```text
+If status becomes packed AND packed_at is empty  → set packed_at = now
+If packed_at already exists                      → keep it
+If status changes away from packed               → do NOT clear packed_at
+```
+
+**Data.** 19 boxes whose `packed_at` تم `null` تم backfilled من ال spreadsheet
+at `12:00:00+00`. No dimensions, weights, quantities, task logs, `pkd_item.created_at`,
+`packed_by` أو statuses تم changed.
+
+### ال measured effect {#the-measured-effect}
+
+لـ one order filtered إلى one destination over a two-week window:
+
+| تقرير date logic | Boxes shown |
+| --- | --- |
+| `MAX(pkd_item.created_at)` | **11** |
+| `COALESCE(instance.packed_at, MAX(pkd_item.created_at))` | **22** |
+
+ال log هو careful that ال 22 تم لا all من ال spreadsheet: 19 backfilled rows
+plus 3 that already had reportable items و a parent package الحالة من `packed`.
+
+A date-logic change doubled a client-facing تقرير. That هو ال scale من consequence
+this ADR exists إلى preserve.
+
+### HISTORICALLY تم التحقق — ال revert, نفس day {#historically-verified-the-revert-same-day}
+
+All value-affecting changes تم reverted on **2026-08-08**, مع verification
+recorded:
+
+- ال 19 `packed_at` values تم set back إلى `null` (19/19 confirmed)
+- `fetch_report_instances` تم reverted إلى `max(pi.created_at) AS last_packed_at`
+- ال محلي UI changes تم reverted
+- ال نفس تقرير filter returned **11** boxes again
+
+## Alternatives {#alternatives}
+
+`task_logs.end_time` **تم** explicitly considered و **explicitly rejected**, مع
+ال reason recorded. That هو ال one genuine alternatives entry في these ADRs.
+
+Any other alternative — a dedicated status-history table, an event log, a
+first-packed trigger — **لا recorded.**
+
+## Consequences {#consequences}
+
+### Positive {#positive}
+
+- **ال rule هو written down مع its reason.** Anyone tempted إلى "improve" ال تقرير
+  بواسطة using task end times سوف find ال argument against it.
+- **ال client no longer destroys ال original date** — تم التحقق live في committed
+  code (below).
+- **A dated audit trail exists**, including a قبل/بعد table per box و a
+  الإنتاج snapshot في `Trail/box-snapshots-2026-08-10.json`.
+
+### Negative {#negative}
+
+- **Neither ال migration nor its revert هو في any المستودع.** A named migration تم
+  applied إلى الإنتاج و rolled back, و ال only record هو prose في a Trail log.
+  See [Schema provenance](/docs/backend/schema-provenance).
+- **الإنتاج data تم edited إلى investigate a reporting سؤال**, مع a
+  hand-rolled JSON backup rather than a reversible migration.
+- **ال end state تم ambiguous until live verification on 2026-08-20.**
+
+### المخاطر {#risks}
+
+- **A client-visible number يمكن change بواسطة 2× من one `COALESCE`.** Any future change
+  here needs a قبل/بعد count on real data, exactly as this investigation did.
+- **Client و server يمكن drift again.** ال الحالي live RPC و client agree,
+  but ال function body هو لا versioned في a المستودع migration.
+- **`packed_at` هو only ever set بواسطة ال website packing list page.** No trigger هو
+  evidenced. Boxes packed through any other مسار may have `packed_at` null
+  indefinitely و fall back إلى item timestamps.
+
+## الحالي State {#current-state}
+
+Live server و الحالي client now agree on ال completion-date rule.
+
+### CURRENTLY تم التحقق — ال client {#currently-verified-the-client}
+
+Commit `04fcc93` (2026-08-11, `iamhashir`) — ال most recent commit في `website` —
+**committed ال write-once behaviour**, و it هو present at HEAD في
+<SourceRef repo="website" path="src/features/reports/components/PackingListPage.tsx" />:
+
+```ts
+// Keep the first packed timestamp stable when a box is reopened.
+// The report RPC uses this value in preference to later item activity.
+const { data: currentInstance } = await supabase
+  .from("order_pkg_instance")
+  .select("packed_at")
+  .eq("id", inst.id)
+  .single();
+
+const packedAt =
+  currentInstance?.packed_at ??
+  (status === "packed" ? new Date().toISOString() : null);
+```
+
+ال نفس commit حدث <SourceRef repo="website" path="src/features/reports/types.ts" />
+so its comment now يقرأ: `item_packed_at` يستخدم *"order_pkg_instance.packed_at, falling
+back إلى MAX(pkd_item.created_at)"*.
+
+Also تم التحقق, من <SourceRef repo="website" path="inspect_rpc.js" />:
+
+```text
+fetch_report_instances(p_client_id, p_order_ids, p_date_from, p_date_to,
+                       p_date_mode, p_destinations, p_has_items_only, p_tag_ids)
+```
+
+`p_date_mode` accepts `packing_started_at`, `packing_completed_at`,
+`item_packed_at`, و falls back إلى instance creation لـ unrecognised modes.
+`item_packed_at` هو a legacy alias لـ completion.
+
+### CURRENTLY تم التحقق — ال server {#currently-verified-the-server}
+
+ال live `fetch_report_instances` overload مع `p_tag_ids` يستخدم
+`COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` لـ
+completion-style date modes. `packing_started_at` يستخدم `MIN(pkd_item.created_at)`.
+
+One further unresolved thread: a migration ملف named
+`add_packing_start_completion_date_modes` exists as an **uncommitted** ملف في a
+superseded محلي checkout. Its name implies additional date modes تم explored بعد
+this episode. Whether it تم ever applied هو غير معروف.
+
+## الدليل {#evidence}
+
+| Claim | المصدر | Confidence |
+| --- | --- | --- |
+| Migration `prefer_instance_packed_at_in_reports` تم applied | Trail log | HISTORICALLY تم التحقق |
+| New logic تم `COALESCE(instance.packed_at, MAX(pkd_item.created_at))` | Trail log | HISTORICALLY تم التحقق |
+| Prior logic تم `MAX(pkd_item.created_at)` | Trail log | HISTORICALLY تم التحقق |
+| `task_logs.end_time` rejected, مع reason | Trail log, quoted verbatim | HISTORICALLY تم التحقق |
+| 19 rows backfilled, then reverted إلى null | Trail log, مع per-box table | HISTORICALLY تم التحقق |
+| تقرير count 11 → 22, then 11 again | Trail log | HISTORICALLY تم التحقق |
+| Everything reverted on 2026-08-08 | Trail log, مع post-revert verification | HISTORICALLY تم التحقق |
+| Client write-once behaviour هو live | commit `04fcc93`, present at HEAD | **CURRENTLY تم التحقق** |
+| Client comments assert ال RPC prefers `packed_at` | `types.ts`, `PackingListPage.tsx` | **CURRENTLY تم التحقق** as a claim في code |
+| RPC signature و `item_packed_at` mode | `inspect_rpc.js`, live Supabase | CURRENTLY تم التحقق |
+| Which SQL هو live في `fetch_report_instances` | live Supabase | CURRENTLY تم التحقق |
+| Whether ال migration still exists في ال project | — | لا recorded في المستودع history |
+| Full set من `p_date_mode` values | live Supabase | CURRENTLY تم التحقق |
+| Whether `add_packing_start_completion_date_modes` تم applied | live function shape, absent repo history | Function shape appears applied; migration ملف remains unversioned |
+| Who decided | — | **لا recorded** |
+| Whether ال client change تم intended إلى accompany a re-applied migration | — | **لا recorded** |
+
+## Related Documentation {#related-documentation}
+
+- [W6 — Packing الدليل و تقرير dates](/docs/workflows/w6-packing-evidence) — ال workflow this rule governs
+- [قاعدة البيانات model](/docs/backend/database-model) — ال four package layers و `order_pkg_instance`
+- [Schema provenance](/docs/backend/schema-provenance) — why ال migration هو لا في any المستودع
+- [Your first change](/docs/guides/getting-started/first-change) — ال MEDIUM-risk example points here
+
+## Remaining أسئلة {#remaining-questions}
+
+- [OQ-011](/docs/reference/open-questions#oq-011) — where migrations ينبغي live. This episode هو ال strongest argument لـ versioning them.
+- **هو `packed_at` ever set outside ال website packing list page?** No trigger هو evidenced. إذا لا, boxes packed بواسطة any other route keep a null `packed_at` و silently fall back إلى item timestamps.
+

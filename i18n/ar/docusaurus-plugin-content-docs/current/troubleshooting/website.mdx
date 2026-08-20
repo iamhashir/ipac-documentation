@@ -1,0 +1,331 @@
+---
+title: "استكشاف أخطاء website"
+sidebar_label: "website"
+description: "تشخيص مشاكل build والوصول والنشر في website."
+---
+
+# website استكشاف الأخطاء {#website-troubleshooting}
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:biome.json',
+    'website:.github/workflows/pr-validation.yml',
+    'website:.github/workflows/ci-cd.yml',
+    'website:src/lib/supabase.ts',
+    'website:src/hooks/usePageAccess.ts',
+    'website:git log',
+  ]}>
+  Failure modes هي traced من ال المستودع scripts, its two CI workflows و its
+  fix history. W1 و W4 reflect patterns visible across many commits, لا a single
+  incident log.
+</Status>
+
+---
+
+## W1 — Build fails on Biome lint أو TypeScript errors {#w1}
+
+### Symptoms {#symptoms}
+
+`npm run build`, `npm run validate`, أو ال CI job fails. Locally ال dev server may
+have been running fine, لأن `vite dev` does لا typecheck.
+
+### Likely cause {#likely-cause}
+
+This هو ال **most frequent** failure mode في this المستودع history — a long run
+من commits exists solely إلى fix it, including *"fixed all lint و ts checks"*,
+*"Fix biome linting errors"*, *"fixed linting و typescript errors … commit قبل
+deploying إلى vercel"* و *"resolve lint a11y label associations"*.
+
+ال reason it bites repeatedly: **`vite dev` type-checks nothing.** Type errors و
+lint violations only appear عندما you explicitly run ال checks, أو عندما CI does.
+
+### Diagnosis {#diagnosis}
+
+Run ال نفس checks CI runs, في ال نفس order:
+
+```bash
+npm run typecheck    # tsc --noEmit
+npm run lint         # biome check --write ./src   (see W3 — this WRITES)
+npm run build        # vite build
+```
+
+`npm run validate` هو `typecheck` then `build`. Note it does **لا** include lint —
+so `validate` passing does لا mean CI سوف pass.
+
+### Resolution {#resolution}
+
+Fix ال reported errors و re-run. Two repository-specific points:
+
+- **Biome config هو لا stock.** `biome.json` disables several rules — including
+  `noExplicitAny`, `noNonNullAssertion`, `noLabelWithoutControl` و
+  `useButtonType` — so do لا assume a rule applies لأن Biome recommends it بواسطة
+  default. Check `biome.json` قبل reworking code إلى satisfy a rule that هو off.
+- **`src/routeTree.gen.ts` هو generated و excluded من Biome.** Do لا hand-edit
+  it, و do لا try إلى lint it clean.
+
+### Do لا {#do-not}
+
+- **Do لا disable a lint rule إلى get a build through** without reading why it fired.
+  Several rules هي already off; adding more erodes ال only automated gate this
+  التطبيق has.
+- **Do لا skip `npm run lint` قبل opening a PR** on ال assumption CI covers it —
+  ال PR workflow does **لا** run lint. See [W4](#w4).
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="website" path="package.json" />
+- <SourceRef repo="website" path="biome.json" />
+
+### Verification {#verification}
+
+`npm run typecheck && npm run lint && npm run build` all succeed.
+
+---
+
+## W2 — App crashes at startup: "المفقود Supabase البيئة variables" {#w2}
+
+### Symptoms {#symptoms}
+
+ال dev server starts, but ال app throws immediately:
+`Missing Supabase environment variables`. A blank page أو an error overlay.
+
+### Likely cause {#likely-cause}
+
+ال Supabase client **throws at module load** إذا either variable هو absent:
+
+```ts
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables");
+}
+```
+
+Common triggers: no `.env` ملف (it هو git-ignored, so a fresh clone has none); ال
+ملف exists but ال variables lack ال `VITE_` prefix, so Vite does لا expose them;
+أو `.env` تم added while ال dev server تم already running.
+
+### Diagnosis {#diagnosis}
+
+```bash
+ls -la .env                                  # exists?
+grep -c VITE_SUPABASE .env                   # expect 2
+```
+
+Variables يجب be prefixed `VITE_` إلى reach ال browser. Unprefixed variables هي
+invisible إلى client code بواسطة design.
+
+### Resolution {#resolution}
+
+```bash
+cp .env.example .env
+# fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+# then RESTART the dev server — Vite reads env at startup
+npm run dev
+```
+
+Values come من a team member أو a secret store, never من documentation. See
+[البيئة variables](/docs/guides/getting-started/environment-variables).
+
+### Do لا {#do-not}
+
+- **Do لا hardcode ال URL و key** into `src/lib/supabase.ts` إلى get moving.
+  Four committed scripts في this المستودع already do this و it هو recorded as a
+  finding ([M3](/docs/security/findings#m3)).
+- **Do لا commit `.env`.** It هو git-ignored deliberately.
+- **Do لا put a service-role أو secret key في a `VITE_` variable.** Anything
+  `VITE_`-prefixed ships إلى ال browser.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="website" path="src/lib/supabase.ts" />
+- <SourceRef repo="website" path=".env.example" />
+
+### Verification {#verification}
+
+ال app loads و ال login page renders.
+
+---
+
+## W3 — `npm run lint` modified my ملفات {#w3}
+
+### Symptoms {#symptoms}
+
+Running lint produces unexpected changes في your working tree — reformatting, import
+reordering, automatic rule fixes.
+
+### Likely cause {#likely-cause}
+
+لا a bug. ال script هو:
+
+```text
+lint: biome check --write ./src
+```
+
+`--write` يعني Biome **applies** fixes rather than only reporting them. Formatting
+يستخدم **tab** indentation per `biome.json`, so a ملف written مع spaces gets
+rewritten.
+
+### Diagnosis {#diagnosis}
+
+```bash
+git diff --stat      # see what lint changed
+```
+
+### Resolution {#resolution}
+
+Review ال changes و keep them — they هي what CI expects. إذا you want a
+report-only run, invoke Biome without `--write`:
+
+```bash
+npx biome check ./src
+```
+
+### Do لا {#do-not}
+
+- **Do لا commit lint changes mixed into an unrelated feature diff.** It makes
+  review harder. Commit formatting separately.
+- **Do لا "fix" ال script بواسطة removing `--write`** — CI's الإنتاج workflow runs
+  `npm run lint`, و auto-fixing there هو what keeps formatting-only issues من
+  failing ال نشر.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="website" path="package.json" />
+- <SourceRef repo="website" path="biome.json" />
+
+### Verification {#verification}
+
+`git diff` shows only intended changes, و `npm run lint` هو a no-op on a second run.
+
+---
+
+## W4 — Passed PR validation, failed ال الإنتاج نشر {#w4}
+
+### Symptoms {#symptoms}
+
+A pull request goes green, هو merged, و ال الإنتاج نشر then fails.
+
+### Likely cause {#likely-cause}
+
+**ال two CI workflows هي لا ال نفس**, و both differences يمكن produce exactly
+this outcome.
+
+| | `pr-validation.yml` | `ci-cd.yml` (الإنتاج) |
+| --- | --- | --- |
+| Node | **22.x** | **24.x** |
+| Lint | **لا run** | **run** |
+| Typecheck | run | run |
+| Tests | run | run مع `continue-on-error: true` |
+| Build | run | run, then `vercel build --prod` و `vercel deploy --prebuilt` |
+
+So a lint violation هو invisible until الإنتاج, و ال الإنتاج build runs on a
+**مختلف Node major** من ال one that validated ال change.
+
+### Diagnosis {#diagnosis}
+
+Reproduce ال الإنتاج job locally, في order:
+
+```bash
+node -v                # compare with 24.x, which production uses
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+إذا `npm run lint` fails locally و ال PR تم green, you have reproduced ال gap.
+
+### Resolution {#resolution}
+
+Short term: run `npm run lint` yourself قبل merging.
+
+Longer term, one من two changes closes ال gap — a decision, لا a lookup:
+
+1. Add ال lint step إلى `pr-validation.yml`, و
+2. Align `NODE_VERSION` across both workflows.
+
+ال Node divergence هو tracked as [OQ-006](/docs/reference/open-questions#oq-006).
+Note also that tests do **لا** gate الإنتاج — `continue-on-error: true` مع only
+two test ملفات في ال المستودع يعني ال effective gate هو lint, typecheck و
+build.
+
+### Do لا {#do-not}
+
+- **Do لا assume a green PR يعني a deployable change.** It currently does لا
+  guarantee lint passes.
+- **Do لا "fix" a نشر failure بواسطة re-running ال job.** These هي deterministic
+  failures, لا flakes.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="website" path=".github/workflows/pr-validation.yml" />
+- <SourceRef repo="website" path=".github/workflows/ci-cd.yml" />
+
+### Verification {#verification}
+
+Lint, typecheck, test و build all pass locally on ال Node version الإنتاج يستخدم.
+
+---
+
+## W5 — A page renders و then redirects away {#w5}
+
+### Symptoms {#symptoms}
+
+A protected page flashes into view قبل ال app navigates elsewhere — أو a مستخدم
+reaches a page you expected their role إلى be blocked من.
+
+### Likely cause {#likely-cause}
+
+**Route guarding هو a client-side effect, لا a gate.** `useRequirePageAccess` runs
+inside `useEffect`, so ال component mounts و renders first, then redirects. It also
+returns early while `profile` هو null, so nothing هو decided until ال role loads.
+
+Two consequences:
+
+- A brief render من protected markup هو expected behaviour, لا a bug.
+- **`/inventory` calls no guard at all** — 13 sibling protected routes do, that one
+  does لا. Recorded as [H1](/docs/security/findings#h1).
+
+Whether ال مستخدم يمكن actually *قراءة data* on such a page هو decided بواسطة RLS. Use
+ال live baseline في
+[Live backend verification](/docs/backend/live-verification), then inspect ال
+الحالي policies لـ ال specific tables ال page يقرأ.
+
+### Diagnosis {#diagnosis}
+
+1. Check whether ال route ملف calls `useRequirePageAccess`.
+2. Check ال role against <SourceRef repo="website" path="src/lib/access.ts" /> —
+   full access هو `admin`, `director`, `executive`, `sales`; `client` gets three
+   pages; `packer` و غير معروف roles get none.
+3. Remember ال four enforcement layers disagree — see
+   [Roles و permissions](/docs/website/roles-and-permissions).
+
+### Resolution {#resolution}
+
+- المفقود guard on a protected route: add `useRequirePageAccess()`, matching its
+  siblings.
+- Wrong role behaviour: this هو likely ال المعروف role divergence, لا a محلي bug.
+  Do لا "fix" it في one layer only.
+
+### Do لا {#do-not}
+
+- **Do لا treat ال client-side guard as a الأمان control.** It hides pages; it
+  does لا protect data. RLS هو ال boundary.
+- **Do لا add a role إلى `FULL_ACCESS_ROLES` إلى unblock someone.** Four independent
+  checks exist; changing one creates a new divergence.
+- **Do لا use `requireAdmin()` من `src/middleware/auth.ts`.** It performs **no**
+  role check و هو called nowhere — see [M4](/docs/security/findings#m4).
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="website" path="src/hooks/usePageAccess.ts" />
+- <SourceRef repo="website" path="src/lib/access.ts" />
+
+### Verification {#verification}
+
+ال page هو reachable بواسطة ال roles it ينبغي be, و ال route calls ال guard.
+

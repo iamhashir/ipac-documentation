@@ -1,0 +1,169 @@
+---
+title: "الأدوار والصلاحيات"
+sidebar_label: "الأدوار والصلاحيات"
+description: "نموذج roles في website وMobile وSupabase."
+---
+
+# Roles و الصلاحيات {#roles-and-permissions}
+
+**IPAC does لا have one role model. It has four, و they disagree.**
+
+This page documents that divergence exactly as المصدر و live قاعدة البيانات state
+show it. It does لا reconcile ال four into a single table, لأن doing so هو
+a product و authorization-design decision.
+
+<Status
+  type="partial"
+  date="2026-08-20"
+  sources={[
+    'website:src/lib/access.ts',
+    'website:src/hooks/usePageAccess.ts',
+    'Mobile:app/index.tsx',
+    'Mobile:app/(admin)/_layout.tsx',
+    'Mobile:app/(packer)/_layout.tsx',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'website:src/types/supabase.ts',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  All four enforcement points تم قراءة directly في المصدر — ال divergence below
+  هو **تم التحقق**, لا inferred. Live role rows تم تم التحقق on 2026-08-20.
+</Status>
+
+## Role names referenced anywhere في المصدر {#role-names-referenced-anywhere-in-source}
+
+`admin` · `director` · `executive` · `sales` · `client` · `packer`
+
+Live `roles.name` rows هي `admin`, `client`, `executive`, `packer`, و
+`sales`. There هو no live `director` row today, even though المصدر checks لـ it.
+
+`team_lead` هو **لا a role**. It هو `order_team_members.is_team_lead`, a boolean
+scoped إلى one order. A packer يمكن be team lead on one order و لا on another.
+Treating it as a global role هو a category error that ال codebase itself warns
+about.
+
+## ال four enforcement points {#the-four-enforcement-points}
+
+### 1. `website` page access {#1-website-page-access}
+
+<SourceRef repo="website" path="src/lib/access.ts" symbol="FULL_ACCESS_ROLES" />
+
+| Role | Access |
+| --- | --- |
+| `admin`, `director`, `executive`, `sales` | All 10 admin pages |
+| `client` | `/dashboard`, `/my-orders`, `/reports` only |
+| `packer` | None — bounced إلى login |
+| anything else | None |
+
+ال ملف own comment describes `executive` as "ال CEO tier (treated as full
+access)". Enforcement هو a client-side `useEffect` redirect via
+`useRequirePageAccess`, و one page — `/inventory` — omits it entirely
+([H1](/docs/security/findings#h1)).
+
+### 2. `Mobile` route guards {#2-mobile-route-guards}
+
+<SourceRef repo="Mobile" path="app/index.tsx" /> and the two group layouts.
+
+| Role | Destination |
+| --- | --- |
+| `admin`, `director`, `sales` | `(admin)` group |
+| `packer` | `(packer)` group |
+| anything else | redirected إلى `/auth/login` |
+
+### 3. `create-user` Edge Function {#3-create-user-edge-function}
+
+<SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" />
+
+Permits `director` أو `admin` only. Anything else receives 403.
+
+### 4. قاعدة البيانات function `can_user_mark_attendance` {#4-database-function-canusermarkattendance}
+
+<SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" />
+
+Grants عندما ال role هو `admin` أو `director` **و** `profiles.status = 'active'`,
+**أو** عندما ال caller هو team lead لـ that order. `SECURITY DEFINER`, granted إلى
+`authenticated` — so this one cannot be bypassed بواسطة a client.
+
+## ال divergence, side بواسطة side {#the-divergence-side-by-side}
+
+| Role | `website` pages | `Mobile` app | يمكن create مستخدمون | يمكن manage attendance |
+| --- | --- | --- | --- | --- |
+| `admin` | Full | admin group | **Yes** | **Yes** |
+| `director` | Full | admin group | **Yes** | **Yes** |
+| `executive` | **Full** | **Locked out** | No | No |
+| `sales` | **Full** | admin group | No | No |
+| `client` | 3 pages | **Locked out** | No | No |
+| `packer` | None | packer group | No | Only as team lead |
+
+Two consequences هي تم التحقق من المصدر, لا speculation:
+
+:::danger `executive` cannot use Mobile at all
+
+`executive` receives full access إلى every page من `website`, و هو لا handled
+بواسطة any Mobile branch. Mobile's entry route sends unrecognised roles إلى
+`/auth/login`, و ال admin layout renders "Access denied. Redirecting…". An
+executive مستخدم therefore cannot مفتوح ال field التطبيق.
+
+This matters لأن `executive` هو one من ال role names that internal documents
+list as **live**, while `director` — which both Mobile و ال Edge Function
+depend on — هو **لا** on that list.
+
+:::
+
+:::warning `director` does لا exist live
+
+Live verification confirmed no `director` role row. مستخدم creation via ال Edge
+Function therefore works لـ `admin` only, و attendance management reduces إلى
+`admin` plus per-order team leads. Nothing في المصدر fails loudly — ال checks
+simply never match.
+
+:::
+
+## Permission flags هي database-side only {#permission-flags-are-database-side-only}
+
+ال `roles` table carries six booleans:
+
+```text
+can_manage_roles      can_ban_users        can_block_users
+can_delete_profiles   can_reset_passwords  can_unblock_users
+```
+
+A `user_effective_permissions` view exists, as do `user_has_permission` و
+`get_user_role` functions.
+
+**No التفويض decision في either التطبيق, أو في ال Edge Function, يقرأ
+any من them.** Every check compares role names. ال Edge Function even selects
+`can_manage_roles` alongside ال role name و then ignores it.
+
+Live RLS does enforce some flags through `user_has_permission`, so ال flags هي
+لا inert. They still do **لا** correspond إلى ال page-level access model.
+There هي no page-access flags في ال قاعدة البيانات, so page access هو purely a
+frontend concern.
+
+## Temporary privileges {#temporary-privileges}
+
+`temporary_privileges` holds `user_id`, `granted_role_id`, `granted_by`,
+`expires_at`, `is_active` و `reason`. A `deactivate_expired_privileges`
+function exists و **no التطبيق calls it**, which implies a trigger أو
+scheduled job.
+
+Time-boxed role elevation هو therefore part من ال قاعدة البيانات التفويض design.
+Live verification found zero temporary privilege rows on 2026-08-20.
+
+## Rules لـ working مع roles {#rules-for-working-with-roles}
+
+Until ال role model هو unified:
+
+1. **Do لا infer access من a role name.** Check all four enforcement points.
+2. **Do لا add a role** without deciding its behaviour في all four.
+3. **Do لا rename أو remove a role.** Four hardcoded lists depend on ال strings,
+   و nothing سوف fail at compile time.
+4. **Do لا use permission flags لـ page access** until ال frontend model هو designed.
+5. **Do لا treat `team_lead` as a role.** It هو per-order state.
+
+## What would resolve this {#what-would-resolve-this}
+
+ال live role set هو now المعروف. What remains هو a design decision: one مشترك
+definition من role capability, مع ال other layers derived من it rather than
+restating it.
+

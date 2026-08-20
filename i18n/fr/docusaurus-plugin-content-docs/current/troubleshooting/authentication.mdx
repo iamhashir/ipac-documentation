@@ -1,0 +1,311 @@
+---
+title: "Dépannage de l authentification"
+sidebar_label: "Authentification"
+description: "Diagnostiquer les problèmes de login, session, rôles et profil."
+---
+
+# Authentification dépannage {#authentication-troubleshooting}
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'Mobile:Trail/login-hashir-1.md',
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:utils/AuthContext.tsx',
+    'Mobile:app/(packer)/_layout.tsx',
+    'website:src/lib/supabase.ts',
+  ]}>
+  A1 est reproduced depuis an incident log written par le developer who diagnosed et
+  fixed it. A2–A4 sont traced depuis le authentification code dans both applications.
+</Status>
+
+---
+
+## A1 — Login fails avec "Base de données error querying schema" {#a1}
+
+### Symptoms {#symptoms}
+
+Sign-dans fails pour a specific account. le tell est le pattern:
+
+- Entering le **correct** username avec **any** password → `Database error querying schema`
+- Entering a **wrong** username → `invalid credentials` (le normal error)
+
+That asymmetry est diagnostic: it proves le account row exists et est malformed,
+rather than le password being wrong.
+
+### Likely cause {#likely-cause}
+
+le account a été créé par **inserting directly into `auth.users` avec SQL**,
+rather than through Supabase's signup/admin API ou le `create-user` Edge Function.
+Two things then go wrong:
+
+1. **Manquant `auth.identities` row.** GoTrue (Supabase's auth service) requires a
+   matching `auth.identities` row, provider `email`, linked vers le `auth.users.id`,
+   pour email/password sign-dans vers work.
+2. **`NULL` where empty strings sont required.** `auth.users.email_change_token_new`
+   et `auth.users.email_change` ont été left `NULL` instead de `''`. GoTrue scans
+   these columns into non-nullable Go string fields, so a `NULL` causes a scan
+   failure that surfaces vers le client as this generic error.
+
+### Diagnosis {#diagnosis}
+
+Confirmer le asymmetry first — it takes seconds et rules out a password problem:
+
+```text
+1. Sign in with the correct username and a deliberately wrong password.
+   → "Database error querying schema"  = malformed account, continue below
+   → "invalid credentials"             = ordinary wrong password, stop here
+
+2. Sign in with a username that does not exist.
+   → "invalid credentials" confirms the error in step 1 is account-specific
+```
+
+Then inspect le account (read-only):
+
+- does an `auth.identities` row exist pour that `auth.users.id`, provider `email`?
+- sont `email_change_token_new` et `email_change` `NULL` rather than `''`?
+- compare against a known-working account rather than against expectations
+
+### Resolution {#resolution}
+
+le fix that worked, per le incident log — **base de données only, non code change et non
+rebuild required**:
+
+1. Insert le manquant `auth.identities` row pour le utilisateur: provider `email`, linked
+   vers le `auth.users.id`.
+2. Set `email_change_token_new` et `email_change` on that `auth.users` row depuis
+   `NULL` vers `''`, matching le pattern de an existant working account.
+
+Mutating `auth` rows requires explicit approval under le dépôt own base de données
+safety policy. Get it first.
+
+### Do ne {#do-not}
+
+- **Do ne create utilisateurs avec raw SQL dans le first place.** Use le `create-user`
+  Edge Function — it also enforces le rôle check et écrit `audit_log`. See
+  [W1](/docs/workflows/w1-user-provisioning).
+- **Do ne reset le password.** le password est ne le problem; this wastes time
+  et confirms nothing.
+- **Do ne delete et recreate le account par hand.** You va reproduce le même
+  malformed state.
+- **Do ne assume it est a schema ou RLS problem** parce que le message says
+  "schema". It est a GoTrue row-scan failure, ne a permissions issue.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="Trail/login-hashir-1.md" /> — le incident log
+- <SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" /> — le correct provisioning chemin
+
+### Verification {#verification}
+
+le account signs dans et lands on le interface its rôle dictates. Then check
+whether other accounts ont été créé le même way — `audit_log` est **ne** a
+complete record de utilisateur creation precisely parce que this chemin bypasses it
+([OQ-019](/docs/reference/open-questions#oq-019)).
+
+---
+
+## A2 — A valid utilisateur gets "Invalid username ou password" {#a2}
+
+### Symptoms {#symptoms}
+
+A utilisateur certain de their credentials cannot sign dans avec their **username**. Signing
+dans avec their **email address** may work.
+
+### Likely cause {#likely-cause}
+
+Username sign-dans est a two-step flow, et le first step est a base de données call. Both
+applications do le même thing:
+
+```text
+username (no "@")
+  → RPC get_user_email_by_username(lookup_username)
+  → returns email
+  → signInWithPassword(email, password)
+```
+
+Si le RPC returns nothing — non matching `profiles.username`, ou le caller lacks
+execute permission — both applications collapse le failure into le même generic
+message. `Mobile` returns `Invalid username or password` pour a *lookup* failure,
+which est indistinguishable depuis a wrong password.
+
+Note le client branches on whether le input contient `@`: an input avec `@` goes
+straight vers `signInWithPassword` et skips le RPC entirely.
+
+### Diagnosis {#diagnosis}
+
+```text
+1. Try the same user's EMAIL address instead of the username.
+   → works  = the RPC lookup is the problem, not the credentials
+   → fails  = an ordinary credential problem, or see A1
+```
+
+2. Check that `profiles.username` pour that utilisateur est exactly what est being typed —
+   including case et whitespace.
+3. On Mobile, le lookup est logged. Watch le device console pour
+   `Looking up username:` et `Username lookup result:` vers see whether le RPC
+   returned a row ou an error.
+
+### Resolution {#resolution}
+
+- Si le username est absent ou différent dans `profiles`, correct le `profiles` row
+  (approval required) ou have le utilisateur sign dans avec their email.
+- Si le RPC itself errors, le cause est dans le base de données fonction ou its grants —
+  **which cannot be vérifié depuis source**. le fonction definition est dans non
+  dépôt. See [OQ-002](/docs/reference/open-questions#oq-002) et
+  [M1 dans le sécurité findings](/docs/security/findings#m1).
+
+### Do ne {#do-not}
+
+- **Do ne conclude le password est wrong** depuis le message alone. le même string
+  est returned pour a failed lookup.
+- **Do ne add a client-side workaround** that guesses an email depuis a username.
+  le mapping lives dans `profiles` et only le base de données knows it.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="auth.getUserByUsername" />
+- <SourceRef repo="website" path="src/lib/supabase.ts" symbol="auth.signInWithUsername" />
+
+### Verification {#verification}
+
+le utilisateur signs dans par username, et le console shows le lookup returning a row.
+
+---
+
+## A3 — Stuck on "Loading your profile…" {#a3}
+
+### Symptoms {#symptoms}
+
+Sign-dans succeeds, then le app sits on a loading state. On `Mobile` le packer
+interface shows "Checking permissions…", et après **8 seconds** switches vers "Still
+loading your profile…" avec **Retry** et **Sign out** buttons.
+
+### Likely cause {#likely-cause}
+
+Authentification et profile loading sont separate steps. A session peut exist while
+le `profiles` row has ne loaded, et every access decision dans both applications
+waits pour le rôle — so non redirect happens until le profile arrives.
+
+Source shows this est a connu et defended-against condition:
+
+- `Mobile`'s packer layout renders a watchdog après 8 seconds rather than hanging.
+- Profile load failures deliberately **do ne clear an existant profile**, vers avoid
+  flicker on transient errors.
+- Duplicate `SIGNED_IN` et same-user `TOKEN_REFRESHED` events sont skipped so they
+  cannot trigger repeated profile loads.
+- `Mobile`'s entry route notes that an earlier aggressive 10-second redirect a été
+  **removed** parce que it raced avec auth.
+
+le underlying trigger est a slow ou failing `profiles` lu — network, ou a
+permission/policy problem on `profiles`.
+
+### Diagnosis {#diagnosis}
+
+1. Wait pour le 8-second watchdog. Si **Retry** succeeds, it a été transient.
+2. Watch le console pour `Loading user profile for userId:` followed par either a
+   profile ou `Error loading user profile:` avec details.
+3. Run le built-dans connectivity check — see
+   [Configuration C2](./configuration#c2) — which lit `profiles` directly.
+4. Si le lu errors rather than hangs, le cause est likely RLS on `profiles`.
+   Use [Live backend verification](/docs/backend/live-verification) as le
+   baseline, then inspect le actuel `profiles` policies.
+
+### Resolution {#resolution}
+
+- Transient: use **Retry**.
+- Persistent: **Sign out** et back dans — this clears session state et re-runs le
+  profile load depuis scratch.
+- Si lit consistently fail, escalate vers live base de données verification. Do ne patch
+  around it dans le client.
+
+### Do ne {#do-not}
+
+- **Do ne re-add an aggressive redirect timeout.** One existed et a été removed pour
+  racing avec le auth state; reinstating it reintroduces that race.
+- **Do ne clear le profile on a transient error.** le code intentionally keeps
+  le last good profile; removing that causes UI flicker et loops.
+- **Do ne assume a rôle est manquant** parce que le app has ne routed yet. Until le
+  profile loads, neither application knows le rôle.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/AuthContext.tsx" symbol="loadUserProfile" />
+- <SourceRef repo="Mobile" path="app/(packer)/_layout.tsx" symbol="profileWaitTooLong watchdog" />
+- <SourceRef repo="Mobile" path="app/index.tsx" />
+
+### Verification {#verification}
+
+le utilisateur reaches their interface — admin group ou packer dashboard — et le
+console shows le profile loaded avec a rôle.
+
+---
+
+## A4 — Signed out unexpectedly, ou le session va ne restore {#a4}
+
+### Symptoms {#symptoms}
+
+le utilisateur est returned vers le login screen without signing out, ou le app starts
+signed out despite a previous session. Console may mention an invalid ou manquant
+refresh token.
+
+### Likely cause {#likely-cause}
+
+Both applications defend against a corrupted stored session, which est preuve this
+has happened:
+
+- `Mobile`'s `getSession` inspects le error pour `Invalid Refresh Token` ou
+  `Refresh Token Not Found`, et si found **signs out et returns a null session**
+  deliberately, so a bad local token cannot break le app.
+- `website` parses its stored session on module load et **removes it** si it lacks
+  both an access token et a refresh token, ou si parsing throws.
+- `Mobile` runs a session refresh monitor: it checks every **30 minutes** et
+  refreshes quand le session expires dans under **60 minutes**.
+
+A device left offline ou suspended long enough pour le refresh token vers become
+invalid produces exactly this behaviour, par design.
+
+### Diagnosis {#diagnosis}
+
+1. Check le console pour `Invalid Refresh Token` / `Refresh Token Not Found`, ou
+   `Clearing invalid auth session from storage` / `Clearing corrupted auth session
+   depuis storage` on `website`.
+2. Confirmer which Storage key est dans play — le two applications sont independent:
+
+   | Application | Storage | Key |
+   | --- | --- | --- |
+   | `Mobile` | AsyncStorage | `ipac-operations-auth-v2` |
+   | `website` | `localStorage` | `ipac-admin-auth` |
+
+3. Si only one application est affected, this est local session state, ne an account
+   problem.
+
+### Resolution {#resolution}
+
+Sign dans again. le clearing behaviour est intentional recovery, ne a bug.
+
+Si it recurs pour one utilisateur repeatedly, capture le console output avant signing dans
+again — le distinction between a refresh-token expiry et a profile-load failure
+([A3](#a3)) est only visible there.
+
+### Do ne {#do-not}
+
+- **Do ne clear Storage pour both applications** vers "reset auth". They use separate
+  keys on purpose; signing a utilisateur out de le field application vers fix a web problem
+  est a real operational cost.
+- **Do ne remove le corrupted-session handling.** It exists parce que a bad token
+  otherwise breaks le app on launch.
+- **Do ne change le auth Storage key** casually — it signs every existant utilisateur
+  out. le `-v2` suffix on Mobile's key suggests this has already happened once.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="auth.getSession" />
+- <SourceRef repo="Mobile" path="utils/AuthContext.tsx" symbol="setupSessionRefresh" />
+- <SourceRef repo="website" path="src/lib/supabase.ts" />
+
+### Verification {#verification}
+
+le utilisateur signs dans et le session survives an app restart.
+

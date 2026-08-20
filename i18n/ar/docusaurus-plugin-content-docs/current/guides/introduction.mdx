@@ -1,0 +1,106 @@
+---
+title: "مقدمة"
+sidebar_label: "مقدمة"
+description: "ما يغطيه موقع التوثيق وكيف تقرأ مستوى الثقة."
+---
+
+# Introduction {#introduction}
+
+IPAC هو an operations system لـ industrial packaging work. It consists من two
+التطبيقات that share a single backend:
+
+- **Mobile** — a React Native / Expo التطبيق مستخدم بواسطة field
+  مشغلون, مع separate interfaces لـ administrative مستخدمون و packers.
+- **website** — a TanStack Start web التطبيق مستخدم بواسطة managers و
+  administrators, which also serves restricted client-facing views.
+
+Both التطبيقات talk إلى ال **نفس Supabase project**: المصادقة,
+PostgreSQL, row level الأمان, Storage, و قاعدة البيانات functions. That single
+مشترك backend هو ال most important fact about this system, و ال المصدر من
+most من its الخطر.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:src/routes/',
+    'Mobile:package.json',
+    'Mobile:app.json',
+    'website:docs/ARCHITECTURE.md',
+  ]}>
+  ال التطبيق inventory, stacks و shared-backend relationship above تم
+  تم التحقق directly against both المستودعات.
+</Status>
+
+## Why this site exists {#why-this-site-exists}
+
+ال system's knowledge currently lives في one developer's head, plus scattered
+ملفات inside ال التطبيق المستودعات. That هو a bus factor من one. This
+site exists so that a developer who has never seen IPAC يمكن understand ال
+system, make a safe change, و know what they هي لا allowed إلى assume —
+without needing إلى ask ال person who built it.
+
+## What هو canonical here {#what-is-canonical-here}
+
+This site هو ال **single المصدر من truth** لـ:
+
+- system الهندسة و cross-application الهندسة
+- onboarding
+- workflows
+- ال الأمان و access model
+- backend الهندسة و قاعدة البيانات concepts
+- mobile التطبيق الهندسة
+- admin التطبيق الهندسة
+- النشر
+- استكشاف الأخطاء
+- architectural decisions
+
+## What stays في ال التطبيق المستودعات {#what-stays-in-the-application-repositories}
+
+Some material belongs next إلى ال code و يجب لا be moved here:
+
+- agent و assistant instructions (`CLAUDE.md`, `AGENTS.md`, Copilot
+  instructions)
+- code-specific conventions enforced during review
+- temporary development notes
+- internal investigation logs
+- implementation-specific instructions
+
+Whole documents هي never duplicated across المستودعات. Where an التطبيق
+المستودع needs إلى point at a concept, it links here; where this site needs إلى
+show implementation detail, it links إلى ال code.
+
+## How much you يمكن trust a page {#how-much-you-can-trust-a-page}
+
+Every page carries a الحالة banner. It هو ال mechanism that keeps this site
+honest as it grows.
+
+| Banner | Meaning |
+| --- | --- |
+| **تم التحقق** | Every claim تم تم التحقق against ال listed المصادر on ال stated date. |
+| **جزئيا تم التحقق** | Some claims تم تم التحقق; others هي inherited من earlier material و لا independently confirmed. ال page says which. |
+| **مفتوح سؤال** | A genuine contradiction أو gap. It هو recorded, لا resolved بواسطة guessing. |
+
+Two rules follow من this, و they هي لا negotiable:
+
+1. **Nothing هو invented.** No table, role, workflow, أو behaviour هو described
+   here unless it تم observed في ال المستودعات, في ال قاعدة البيانات, أو في
+   الموجود documentation that هو cited.
+2. **Contradictions هي published, لا settled.** Where الموجود المصادر
+   disagree, ال disagreement هو written down on ال
+   [مفتوح questions](/docs/reference/open-questions) page until someone verifies
+   ال answer against ال live system.
+
+إذا you find a page that contradicts ال code, ال code هو right و ال page هو
+a bug. Fix it, و update its الحالة banner.
+
+## Where إلى go next {#where-to-go-next}
+
+- **Never worked on IPAC قبل?** Start مع
+  [Getting started](/docs/guides/getting-started/overview).
+- **Need ال shape من ال system?** قراءة
+  [System architecture](/docs/guides/architecture/system-overview).
+- **About إلى change something مشترك?** Work through ال
+  [cross-application impact checklist](/docs/guides/architecture/cross-app-impact-checklist).
+

@@ -1,0 +1,27 @@
+---
+title: هندسة بين التطبيقات
+sidebar_label: هندسة Cross-App
+description: كيف يتفاعل Mobile وwebsite عبر backend المشترك.
+---
+
+<header>
+# هندسة بين التطبيقات
+</header>
+
+<Status type="verified" date="2026-08-19">
+  تبقى أسماء tables وRPC وpolicies غير مترجمة.
+</Status>
+
+لا يتواصل Mobile وwebsite عبر API versioned بينهما. ينسقان السلوك عبر الحالة المشتركة في Supabase.
+
+## مناطق مشتركة
+
+- tables التي يقرأها أو يكتبها التطبيقان.
+- Auth وprofiles.
+- roles وقرارات access.
+- RLS policies.
+- Storage buckets وpublic URLs.
+- RPC وEdge Function.
+
+عندما يمس تغيير هذه المناطق، تحقق من التطبيق الآخر قبل merge.
+

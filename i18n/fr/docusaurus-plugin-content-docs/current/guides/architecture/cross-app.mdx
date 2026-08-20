@@ -1,0 +1,27 @@
+---
+title: Architecture inter-applications
+sidebar_label: Architecture inter-apps
+description: Comment Mobile et website interagissent via le backend partagé.
+---
+
+<header>
+# Architecture inter-applications
+</header>
+
+<Status type="verified" date="2026-08-19">
+  Les noms de tables, RPC et politiques restent non traduits.
+</Status>
+
+Mobile et website ne communiquent pas via une API versionnée entre eux. Ils coordonnent leur comportement via l état partagé dans Supabase.
+
+## Zones à traiter comme partagées
+
+- Tables lues ou écrites par les deux applications.
+- Auth et profiles.
+- Roles et décisions d accès.
+- RLS policies.
+- Storage buckets et URLs publiques.
+- RPC et Edge Function.
+
+Quand une modification touche ces zones, vérifiez l autre application avant merge.
+

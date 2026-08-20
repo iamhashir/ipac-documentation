@@ -1,0 +1,98 @@
+---
+title: "Checklist d impact cross-app"
+sidebar_label: "Checklist impact"
+description: "Checklist à utiliser avant de modifier une surface partagée."
+---
+
+# Cross-application impact checklist {#cross-application-impact-checklist}
+
+le backend est partagé. This checklist exists so that a change made pour one
+application does ne silently break le other.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['website:docs/DEVELOPMENT.md', 'website:docs/ARCHITECTURE.md']}>
+  Derived depuis `website`'s own work order et architectural principles,
+  restructured as a checklist. It adds non new claims about le system.
+</Status>
+
+## Quand vers use it {#when-to-use-it}
+
+Any time your change touches a partagé object:
+
+- a table, column, ou view
+- a row level sécurité policy
+- a base de données fonction, RPC, ou trigger
+- authentification ou session behaviour
+- a Storage bucket ou its contents
+- an edge fonction
+
+Si your change est confined vers one application components et styling, you do ne
+need this. Si you sont unsure, you do.
+
+## le checklist {#the-checklist}
+
+**1. Identify every backend object you sont touching.** Name le tables, views,
+fonctions, policies, triggers et buckets explicitly. Si you cannot list them,
+you do ne yet know what your change does.
+
+**2. Search both applications pour each object.** Ne just le one you sont working
+dans. A table name, fonction name ou bucket name utilisé dans le other application
+signifie your change reaches it.
+
+**3. Inspect le triggers on those tables avant changing any mutation.** Check
+le fonctions they call. See
+[Trigger-driven behaviour](./trigger-driven-behaviour).
+
+**4. Check le row level sécurité policies.** Ask what changes pour each kind de
+utilisateur, dans both applications. Policies sont le real autorisation boundary;
+frontend guards sont ne.
+
+**5. Check whether business logic already lives dans le base de données.** Si a rule est
+enforced par a constraint, fonction ou trigger, do ne reimplement it dans a client.
+
+**6. Consider both mobile interfaces.** `Mobile` has separate
+administrative et packer interfaces pour différent form factors. A partagé
+component change affects both.
+
+**7. Consider le client portal.** `website` serves external client views
+depuis le même déploiement et le même policy set. Widening a policy peut widen
+client-visible data.
+
+**8. Check both migration directories.** Schema history est split across le two
+application dépôts; neither est complete on its own.
+
+**9. Make le smallest practical change**, then validate. pour `website`:
+typecheck, build, test, lint. pour `Mobile`, vérifier on a device — there
+sont non equivalent scripts.
+
+**10. State le cross-application impact dans your pull request.** Explicitly:
+which screens et workflows sont affected dans each application, et what base de données
+impact le change has. Si le answer est "none", say why you sont confident.
+
+## Escalate rather than guess {#escalate-rather-than-guess}
+
+Stop et ask, ou record an [ouverte question](/docs/reference/open-questions), quand:
+
+- le change depends on which rôle peut do something — le live rôle set est
+  contradicted across sources
+  ([OQ-002](/docs/reference/open-questions#oq-002))
+- you cannot tell whether a mobile administrative screen est actuel ou legacy
+- documentation et code disagree about a table name ou existence
+  ([OQ-007](/docs/reference/open-questions#oq-007))
+- le change would need a service-role key anywhere near a client
+
+## le underlying principles {#the-underlying-principles}
+
+depuis le existant architecture document, et still le right instincts:
+
+1. Vérifier actuel code et le base de données avant trusting older documentation.
+2. Treat Supabase as partagé infrastructure.
+3. Check both applications avant changing partagé tables, RPCs, policies, auth,
+   ou Storage.
+4. Keep package definitions, overviews, instances et packed items distinct.
+5. Treat rôle names as technical details, ne business truth.
+6. Expect base de données triggers vers change state indirectly.
+7. Prefer small, focused changes avec validation.
+

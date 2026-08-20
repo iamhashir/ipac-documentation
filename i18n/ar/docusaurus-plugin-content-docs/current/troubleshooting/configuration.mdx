@@ -1,0 +1,352 @@
+---
+title: "استكشاف أخطاء الإعداد"
+sidebar_label: "الإعداد"
+description: "تشخيص variables وnetwork وwebhooks والبيئة."
+---
+
+# الإعداد استكشاف الأخطاء {#configuration-troubleshooting}
+
+Problems where ال code هو fine و ال الإعداد هو لا.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:app.json',
+    'Mobile:components/debug/NetworkTest.tsx',
+    'Mobile:WARP.md',
+    'Mobile:.nvmrc',
+    'website:.github/workflows/',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'website:server/api/webhooks/resend/inbound.post.ts',
+  ]}>
+  All entries هي قراءة directly من الإعداد و المصدر. **No live قاعدة البيانات أو
+  Supabase dashboard access تم مستخدم**, و every entry here هو diagnosable without it.
+</Status>
+
+---
+
+## C1 — Editing `.env` has no effect on Mobile {#c1}
+
+### Symptoms {#symptoms}
+
+You set `EXPO_PUBLIC_SUPABASE_URL` في `Mobile/.env` إلى point at a مختلف Supabase
+project, restart, و ال app still connects إلى ال original one. ال change appears
+إلى be ignored — لأن it هو.
+
+### Likely cause {#likely-cause}
+
+**`app.json` takes precedence, و it ships real values.** ال client يقرأ
+`Constants.expoConfig.extra.supabaseUrl` first و `process.env.EXPO_PUBLIC_SUPABASE_URL`
+only as a fallback — so لأن `app.json` carries both Supabase values, ال fallback
+هو **never reached**.
+
+ال exact resolution order هو documented once, في
+[البيئة variables](/docs/guides/getting-started/environment-variables).
+
+### Diagnosis {#diagnosis}
+
+```bash
+# what app.json actually declares (keys only, no values printed)
+node -p "Object.keys(require('./app.json').expo.extra)"
+```
+
+إذا `supabaseUrl` و `supabasePublishableKey` appear, `.env` هو inert لـ those two
+settings.
+
+### Resolution {#resolution}
+
+إلى point at a مختلف project you يجب change `app.json`, then rebuild. Expo يقرأ
+`app.json` at build time, so a Metro restart alone هو لا enough.
+
+ال proper fix هو إلى remove ال Supabase values من `app.json` so ال
+`EXPO_PUBLIC_*` fallback becomes live — which also resolves
+[M2 في ال الأمان findings](/docs/security/findings#m2). That هو a change إلى
+`Mobile`, which this documentation does لا make.
+
+### Do لا {#do-not}
+
+- **Do لا add a second config مسار** في code إلى work around ال precedence. Two
+  mechanisms لـ one setting هو ال problem, لا ال solution.
+- **Do لا put a secret أو service-role key في `app.json`.** It هو committed إلى git.
+  ال value currently there هو ال publishable/anon key, which هو public بواسطة design —
+  a secret key في that slot would be a serious exposure.
+- **Do لا assume `.env` هو unused.** `EXPO_PUBLIC_APP_NAME` و
+  `EXPO_PUBLIC_APP_VERSION` have no `app.json` counterpart و do take effect.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" />
+- <SourceRef repo="Mobile" path="app.json" />
+- <SourceRef repo="Mobile" path=".env.example" />
+
+### Verification {#verification}
+
+ال app connects إلى ال intended project. Note ال client also logs its resolved URL
+و key إلى ال console on every launch, which makes this directly observable — و هو
+itself a recorded finding.
+
+---
+
+## C2 — Cannot tell whether Supabase هو reachable {#c2}
+
+### Symptoms {#symptoms}
+
+Data does لا load, و it هو unclear whether ال cause هو ال network, ال
+الإعداد, المصادقة, أو a قاعدة البيانات permission.
+
+### Likely cause {#likely-cause}
+
+Any من ال four — which هو why ال المستودع ships a diagnostic component لـ
+exactly this.
+
+### Diagnosis {#diagnosis}
+
+`Mobile` يحتوي <SourceRef repo="Mobile" path="components/debug/NetworkTest.tsx" />,
+which performs a layered check:
+
+| Test | What it proves |
+| --- | --- |
+| `select count from profiles limit 1` | ال client هو configured, reachable, و يمكن قراءة `profiles` |
+| `rpc('get_user_email_by_username', { lookup_username: 'test' })` | ال username-login RPC exists و هو callable |
+| Presence من `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Whether `.env` variables هي loaded |
+
+:::warning ال البيئة check في this component يمكن mislead
+
+`NetworkTest` يقرأ `process.env.EXPO_PUBLIC_*` **directly**, while ال real client
+prefers `app.json` (see [C1](#c1)). So ال component يمكن تقرير
+`Environment variables missing` while ال app هو working perfectly, لأن ال app
+هو using `app.json` values that ال component does لا inspect.
+
+Treat its Supabase و RPC results as authoritative, و its البيئة verdict as
+informational only.
+
+:::
+
+لـ `website`, ال equivalent first check هو whether ال app throws
+`Missing Supabase environment variables` at startup — see
+[W2](./website#w2).
+
+### Resolution {#resolution}
+
+Interpret ال results:
+
+- **Both tests pass** → الإعداد و connectivity هي fine. ال problem هو
+  elsewhere: المصادقة ([A3](./authentication#a3)) أو a table-specific
+  permission.
+- **`profiles` قراءة fails** → الإعداد, network, أو RLS on `profiles`.
+- **`profiles` قراءة succeeds, RPC fails** → ال function أو its grants. Live
+  verification confirms ال username lookup RPC هو `SECURITY DEFINER` و
+  callable بواسطة `anon`; see
+  [M1 في ال الأمان findings](/docs/security/findings#m1).
+
+:::info Where source-based diagnosis stops
+
+إذا ال `profiles` قراءة fails مع a permission error rather than a network error,
+ال cause هو likely RLS. Use
+[Live backend verification](/docs/backend/live-verification) as ال baseline,
+then inspect ال الحالي `profiles` policy bodies قبل changing anything.
+
+:::
+
+### Do لا {#do-not}
+
+- **Do لا conclude ال backend هو down** من a failed قراءة. Distinguish a network
+  error من a permission error; ال messages differ.
+- **Do لا leave debug components on a user-facing screen.** `NetworkTest` هو a
+  developer tool.
+- **Do لا run كتابة tests against الإنتاج إلى "check connectivity."** Read-only بواسطة
+  default, per ال المستودع own قاعدة البيانات safety policy.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="components/debug/NetworkTest.tsx" />
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" />
+
+### Verification {#verification}
+
+Both diagnostic tests تقرير success, و ال failing screen loads.
+
+---
+
+## C3 — Setup instructions reference ملفات that do لا exist {#c3}
+
+### Symptoms {#symptoms}
+
+You follow a setup document, reach a step that names a ملف, و ال ملف هو لا
+there.
+
+### Likely cause {#likely-cause}
+
+Two تم التحقق cases. Both هي stale instructions في ال التطبيق المستودعات, لا
+mistakes on your part.
+
+**`Mobile/WARP.md`** — its "قاعدة البيانات Setup" section says:
+
+```text
+3. Run database setup from `docs/complete-database-setup.sql` in Supabase SQL Editor
+4. Apply RLS policies from `docs/supabase-rls-policies.sql`
+```
+
+**`Mobile` has no `docs/` directory.** Neither ملف exists. ال only SQL في ال
+المستودع هو one migration under `supabase/migrations/` و an ad-hoc
+`scripts/fix-unit-names.sql`.
+
+**`website/CLAUDE.md`** — instructs contributors إلى consult a `.docs/` reference set
+(data flow, قاعدة البيانات schema, query patterns, component الهندسة, input
+validation, CI/CD setup) و إلى append every task إلى `.docs/engineering-worklog.md`.
+**No `.docs/` directory exists.** Tracked as
+[OQ-004](/docs/reference/open-questions#oq-004).
+
+### Diagnosis {#diagnosis}
+
+```bash
+ls Mobile/docs 2>&1        # No such file or directory
+ls website/.docs 2>&1      # No such file or directory
+```
+
+### Resolution {#resolution}
+
+Use ال المصادر that do exist:
+
+- **قاعدة البيانات setup:** there هو no runnable setup script. ال قاعدة البيانات هو **لا
+  reproducible من ال المستودعات** — one migration covers 67 live tables. See
+  [Schema provenance](/docs/backend/schema-provenance).
+- **Development conventions:** `website/CLAUDE.md` و `website/AGENTS.md` هي الحالي
+  و useful لـ everything except ال `.docs/` references. `AGENTS.md` في particular
+  carries a real قاعدة البيانات Safety policy و change process.
+- **Setup steps:** use [Getting started](/docs/guides/getting-started/overview) on
+  this site, which تم written against what هو actually في ال المستودعات.
+
+### Do لا {#do-not}
+
+- **Do لا go looking لـ those SQL ملفات** في old branches أو zip archives on ال
+  assumption they هي authoritative. Even إذا found, they would predate ال الحالي
+  schema بواسطة an غير معروف margin.
+- **Do لا run any recovered setup SQL against ال مشترك project.** It هو ال live
+  الإنتاج قاعدة البيانات لـ both التطبيقات.
+- **Do لا treat ال `.docs/` worklog protocol as an active requirement.** It cannot
+  be satisfied.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="WARP.md" />
+- <SourceRef repo="website" path="CLAUDE.md" />
+- <SourceRef repo="website" path="AGENTS.md" />
+
+### Verification {#verification}
+
+You يمكن complete محلي setup لـ both التطبيقات without ال المفقود ملفات —
+[Getting started](/docs/guides/getting-started/overview) does لا depend on them.
+
+---
+
+## C4 — Which service-role variable هو actually في use? {#c4}
+
+### Symptoms {#symptoms}
+
+A server-side أو Edge Function feature fails مع a credentials error, أو you need إلى
+rotate a key و cannot tell which variable name هو live.
+
+### Likely cause {#likely-cause}
+
+**Both privileged code مسارات accept several names لـ ال نفس secret**, so ال
+authoritative one هو ambiguous:
+
+| Code مسار | Resolution order |
+| --- | --- |
+| `create-user` Edge Function | `SUPABASE_SERVICE_ROLE_KEY` → `SERVICE_ROLE_KEY` → `AUTH_SECRET_KEY` |
+| Resend inbound webhook | `SUPABASE_SECRET_KEY` → `SUPABASE_SERVICE_ROLE_KEY` |
+
+ال Edge Function returns
+`Server misconfiguration: missing service role key` عندما none هو set.
+
+### Diagnosis {#diagnosis}
+
+Check which names هي set في each البيئة — ال Supabase Edge Function secrets
+لـ ال function, و ال Vercel project البيئة لـ ال webhook. **Print names,
+never values.**
+
+ال consequence إلى internalise: **you cannot prove a key has been rotated** without
+checking every name في every البيئة. A stale value under a fallback name keeps
+working silently.
+
+### Resolution {#resolution}
+
+Set ال preferred name لـ each مسار و تأكيد ال others هي unset, so behaviour هو
+deterministic. Consolidating onto one name per مسار هو a change إلى ال التطبيق
+المستودعات, which this documentation does لا make. Recorded as
+[M7](/docs/security/findings#m7).
+
+### Do لا {#do-not}
+
+- **Do لا put any من these في a `VITE_` أو `EXPO_PUBLIC_` variable.** They would ship
+  إلى ال client. A service-role key bypasses RLS entirely.
+- **Do لا paste a key into a ticket, log, chat, أو an AI prompt.** Pasting into a
+  prompt هو disclosure.
+- **Do لا rotate بواسطة setting a new name** و leaving ال old one populated.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" />
+- <SourceRef repo="website" path="server/api/webhooks/resend/inbound.post.ts" />
+
+### Verification {#verification}
+
+Privileged operations succeed مع exactly one variable name set per مسار.
+
+---
+
+## C5 — Node version mismatch {#c5}
+
+### Symptoms {#symptoms}
+
+An install أو build behaves differently between machines, أو between محلي و CI.
+
+### Likely cause {#likely-cause}
+
+Three مختلف Node versions هي declared across ال two التطبيقات:
+
+| المصدر | Version |
+| --- | --- |
+| `Mobile/.nvmrc` | 22.19.0 |
+| `website` PR validation workflow | 22.x |
+| `website` الإنتاج workflow | **24.x** |
+
+`website` therefore validates pull requests on one major و builds الإنتاج on
+another. See [W4](./website#w4).
+
+### Diagnosis {#diagnosis}
+
+```bash
+node -v
+cat Mobile/.nvmrc                                       # 22.19.0
+grep NODE_VERSION website/.github/workflows/*.yml       # 22.x and 24.x
+```
+
+### Resolution {#resolution}
+
+`Mobile` carries a `.nvmrc`, so `nvm use` في that directory selects ال right version.
+`website` has **no `.nvmrc`** — match ال workflow you care about, و prefer 24.x
+عندما reproducing a الإنتاج build failure.
+
+Choosing one version per التطبيق هو a decision, tracked as
+[OQ-006](/docs/reference/open-questions#oq-006).
+
+### Do لا {#do-not}
+
+- **Do لا assume your محلي Node matches الإنتاج.** لـ `website` it very likely
+  does لا.
+- **Do لا commit a `package-lock.json` regenerated on a مختلف Node major** while
+  investigating something unrelated.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path=".nvmrc" />
+- <SourceRef repo="website" path=".github/workflows/ci-cd.yml" />
+
+### Verification {#verification}
+
+`node -v` matches ال version مستخدم بواسطة ال pipeline you هي reproducing.
+

@@ -1,0 +1,125 @@
+---
+title: "Architectural Decision Records"
+sidebar_label: "ADR"
+description: "Index des décisions architecturales IPAC."
+---
+
+# Architectural decisions {#architectural-decisions}
+
+An **ADR** — Architecture Decision Record — est a short document recording a
+decision that shaped le system: what a été decided, why, et what it cost.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['ipac-documentation:docs/adr/']}>
+  This page documents a convention adopted dans this dépôt, so it est
+  self-verifying. le individual ADRs each carry their own preuve confidence.
+</Status>
+
+## Why IPAC keeps them {#why-ipac-keeps-them}
+
+IPAC's knowledge concentrated dans very few people: one application est 91% le work
+de a single author, le other 70%. Code shows *what* le system does. It almost never
+shows **why a choice a été made, ou what a été rejected** — et that est exactly what a
+new developer needs dans order vers change something safely rather than reverse a
+deliberate decision par accident.
+
+Three decisions dans this system sont already at risque de being lost, et they sont le
+three recorded here.
+
+:::danger An ADR est ne permission vers reconstruct history
+
+These ADRs ont été written **après le fact**, depuis dépôt preuve. Non formal ADR
+process existed at le time any de these decisions ont été made.
+
+le rule that follows depuis that:
+
+- Si le dépôt proves **what changed, quand, et why** → record all three.
+- Si it proves only **what changed** → record only that, et écrit
+  **"Ne recorded"** pour le rest.
+
+Never infer a motive depuis an outcome. A plausible rationale presented as fact est
+worse than an admitted gap, parce que le next developer cannot tell le difference.
+
+:::
+
+## le records {#the-records}
+
+| ADR | Subject | Statut | Preuve confidence |
+| --- | --- | --- | --- |
+| [ADR-0001](./adr-0001-website-framework) | Web application framework: Expo Web → TanStack Start | Accepted | High — motivation stated dans le dépôt |
+| [ADR-0002](./adr-0002-repository-migration) | Dépôt et organisation migration | Accepted | High pour *what*, none pour *why* |
+| [ADR-0003](./adr-0003-report-packed-date) | Rapport packed-date semantics | **Accepted** | Vérifié live 2026-08-20 |
+
+## Lifecycle states {#lifecycle-states}
+
+IPAC utilise six. le last two exist parce que retrofitted records cannot always claim
+more.
+
+| Statut | Meaning |
+| --- | --- |
+| **Proposed** | Written et under discussion. Ne dans effect. |
+| **Accepted** | Decided et dans effect. le actuel intended design. |
+| **Superseded** | Replaced par a later ADR, which doit be named. Kept, never deleted. |
+| **Deprecated** | Non longer intended, avec non direct replacement. |
+| **Historical** | Records something that demonstrably happened, reconstructed après le fact. It documents le past; it does ne assert le present. |
+| **Unresolved** | le decision a été made et applied, but **le actuel state cannot be vérifié**. Doit link le ouverte question that would settle it. |
+
+`Historical / Current state unresolved` est a legitimate combination, et
+[ADR-0003](./adr-0003-report-packed-date) utilise it: what a été done est provable, what est
+live today est ne.
+
+## Quand a new ADR est required {#when-a-new-adr-is-required}
+
+Écrit one quand le change affects:
+
+- **application architecture** — framework, rendering model, routing strategy
+- **partagé backend contracts** — a table, RPC signature ou enum that both
+  applications depend on
+- **le authentification ou autorisation model** — including anything touching le
+  four enforcement layers
+- **RLS strategy** — how policies sont structured, ne an individual policy
+- **major framework changes** — a dependency le architecture rests on
+- **déploiement architecture** — hosting, pipeline, ou release mechanism
+- **cross-application data contracts** — anything dans le 26 partagé tables
+- **migration strategy** — schema versioning, dépôt moves, data backfills
+
+le test: *would a competent developer six months depuis now reverse this par accident
+parce que le reason est invisible?* Si oui, écrit le ADR.
+
+## Quand an ADR est ne required {#when-an-adr-is-not-required}
+
+Do ne écrit one pour routine implementation decisions:
+
+- choosing a component structure inside one feature
+- naming, formatting, refactoring
+- adding a field vers an existant screen
+- fixing a bug without changing a contract
+- dependency patch et minor upgrades
+
+pour those, le code, le commit message et — where relevant — a `Trail/` entry dans
+le application dépôt sont enough. See
+[step 11 de Your first change](/docs/guides/getting-started/first-change#step-11) pour
+le documentation rule that governs le everyday case.
+
+## Writing one {#writing-one}
+
+Copy le section structure depuis any existant ADR. Every one carries a header block:
+
+```text
+Status:              one of the six above
+Date:                when the decision took effect, or "Not recorded"
+Decision owners:     who decided, or "Not recorded"
+Evidence confidence: what the repository actually proves
+```
+
+Then: Context · Problem · Decision · Alternatives · Consequences (positive,
+negative, risques) · Actuel State · Preuve · Related Documentation · Ouverte
+Questions.
+
+**Alternatives est le section most often faked.** Si non alternative a été evaluated at
+le time — ou si le evaluation a été ne written down — le honest entry est
+**"Ne recorded."** Listing alternatives you thought de while writing le ADR
+misrepresents le decision as more considered than it a été.
+

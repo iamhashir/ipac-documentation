@@ -1,0 +1,311 @@
+---
+title: "استكشاف أخطاء المصادقة"
+sidebar_label: "المصادقة"
+description: "تشخيص مشاكل login وsession وroles وprofile."
+---
+
+# المصادقة استكشاف الأخطاء {#authentication-troubleshooting}
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'Mobile:Trail/login-hashir-1.md',
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:utils/AuthContext.tsx',
+    'Mobile:app/(packer)/_layout.tsx',
+    'website:src/lib/supabase.ts',
+  ]}>
+  A1 هو reproduced من an incident log written بواسطة ال developer who diagnosed و
+  fixed it. A2–A4 هي traced من ال المصادقة code في both التطبيقات.
+</Status>
+
+---
+
+## A1 — Login fails مع "قاعدة البيانات error querying schema" {#a1}
+
+### Symptoms {#symptoms}
+
+Sign-في fails لـ a specific account. ال tell هو ال pattern:
+
+- Entering ال **correct** username مع **any** password → `Database error querying schema`
+- Entering a **wrong** username → `invalid credentials` (ال normal error)
+
+That asymmetry هو diagnostic: it proves ال account row exists و هو malformed,
+rather than ال password being wrong.
+
+### Likely cause {#likely-cause}
+
+ال account تم أنشئ بواسطة **inserting directly into `auth.users` مع SQL**,
+rather than through Supabase's signup/admin API أو ال `create-user` Edge Function.
+Two things then go wrong:
+
+1. **المفقود `auth.identities` row.** GoTrue (Supabase's auth service) requires a
+   matching `auth.identities` row, provider `email`, linked إلى ال `auth.users.id`,
+   لـ email/password sign-في إلى work.
+2. **`NULL` where empty strings هي required.** `auth.users.email_change_token_new`
+   و `auth.users.email_change` تم left `NULL` instead من `''`. GoTrue scans
+   these columns into non-nullable Go string fields, so a `NULL` causes a scan
+   failure that surfaces إلى ال client as this generic error.
+
+### Diagnosis {#diagnosis}
+
+تأكيد ال asymmetry first — it takes seconds و rules out a password problem:
+
+```text
+1. Sign in with the correct username and a deliberately wrong password.
+   → "Database error querying schema"  = malformed account, continue below
+   → "invalid credentials"             = ordinary wrong password, stop here
+
+2. Sign in with a username that does not exist.
+   → "invalid credentials" confirms the error in step 1 is account-specific
+```
+
+Then inspect ال account (read-only):
+
+- does an `auth.identities` row exist لـ that `auth.users.id`, provider `email`?
+- هي `email_change_token_new` و `email_change` `NULL` rather than `''`?
+- compare against a known-working account rather than against expectations
+
+### Resolution {#resolution}
+
+ال fix that worked, per ال incident log — **قاعدة البيانات only, no code change و no
+rebuild required**:
+
+1. Insert ال المفقود `auth.identities` row لـ ال مستخدم: provider `email`, linked
+   إلى ال `auth.users.id`.
+2. Set `email_change_token_new` و `email_change` on that `auth.users` row من
+   `NULL` إلى `''`, matching ال pattern من an الموجود working account.
+
+Mutating `auth` rows requires explicit approval under ال المستودع own قاعدة البيانات
+safety policy. Get it first.
+
+### Do لا {#do-not}
+
+- **Do لا create مستخدمون مع raw SQL في ال first place.** Use ال `create-user`
+  Edge Function — it also enforces ال role check و يكتب `audit_log`. See
+  [W1](/docs/workflows/w1-user-provisioning).
+- **Do لا reset ال password.** ال password هو لا ال problem; this wastes time
+  و confirms nothing.
+- **Do لا delete و recreate ال account بواسطة hand.** You سوف reproduce ال نفس
+  malformed state.
+- **Do لا assume it هو a schema أو RLS problem** لأن ال message says
+  "schema". It هو a GoTrue row-scan failure, لا a الصلاحيات issue.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="Trail/login-hashir-1.md" /> — ال incident log
+- <SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" /> — ال correct provisioning مسار
+
+### Verification {#verification}
+
+ال account signs في و lands on ال interface its role dictates. Then check
+whether other accounts تم أنشئ ال نفس way — `audit_log` هو **لا** a
+complete record من مستخدم creation precisely لأن this مسار bypasses it
+([OQ-019](/docs/reference/open-questions#oq-019)).
+
+---
+
+## A2 — A valid مستخدم gets "Invalid username أو password" {#a2}
+
+### Symptoms {#symptoms}
+
+A مستخدم certain من their credentials cannot sign في مع their **username**. Signing
+في مع their **email address** may work.
+
+### Likely cause {#likely-cause}
+
+Username sign-في هو a two-step flow, و ال first step هو a قاعدة البيانات call. Both
+التطبيقات do ال نفس thing:
+
+```text
+username (no "@")
+  → RPC get_user_email_by_username(lookup_username)
+  → returns email
+  → signInWithPassword(email, password)
+```
+
+إذا ال RPC returns nothing — no matching `profiles.username`, أو ال caller lacks
+execute permission — both التطبيقات collapse ال failure into ال نفس generic
+message. `Mobile` returns `Invalid username or password` لـ a *lookup* failure,
+which هو indistinguishable من a wrong password.
+
+Note ال client branches on whether ال input يحتوي `@`: an input مع `@` goes
+straight إلى `signInWithPassword` و skips ال RPC entirely.
+
+### Diagnosis {#diagnosis}
+
+```text
+1. Try the same user's EMAIL address instead of the username.
+   → works  = the RPC lookup is the problem, not the credentials
+   → fails  = an ordinary credential problem, or see A1
+```
+
+2. Check that `profiles.username` لـ that مستخدم هو exactly what هو being typed —
+   including case و whitespace.
+3. On Mobile, ال lookup هو logged. Watch ال device console لـ
+   `Looking up username:` و `Username lookup result:` إلى see whether ال RPC
+   returned a row أو an error.
+
+### Resolution {#resolution}
+
+- إذا ال username هو absent أو مختلف في `profiles`, correct ال `profiles` row
+  (approval required) أو have ال مستخدم sign في مع their email.
+- إذا ال RPC itself errors, ال cause هو في ال قاعدة البيانات function أو its grants —
+  **which cannot be تم التحقق من المصدر**. ال function definition هو في no
+  المستودع. See [OQ-002](/docs/reference/open-questions#oq-002) و
+  [M1 في ال الأمان findings](/docs/security/findings#m1).
+
+### Do لا {#do-not}
+
+- **Do لا conclude ال password هو wrong** من ال message alone. ال نفس string
+  هو returned لـ a failed lookup.
+- **Do لا add a client-side workaround** that guesses an email من a username.
+  ال mapping lives في `profiles` و only ال قاعدة البيانات knows it.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="auth.getUserByUsername" />
+- <SourceRef repo="website" path="src/lib/supabase.ts" symbol="auth.signInWithUsername" />
+
+### Verification {#verification}
+
+ال مستخدم signs في بواسطة username, و ال console shows ال lookup returning a row.
+
+---
+
+## A3 — Stuck on "Loading your profile…" {#a3}
+
+### Symptoms {#symptoms}
+
+Sign-في succeeds, then ال app sits on a loading state. On `Mobile` ال packer
+interface shows "Checking الصلاحيات…", و بعد **8 seconds** switches إلى "Still
+loading your profile…" مع **Retry** و **Sign out** buttons.
+
+### Likely cause {#likely-cause}
+
+المصادقة و profile loading هي separate steps. A session يمكن exist while
+ال `profiles` row has لا loaded, و every access decision في both التطبيقات
+waits لـ ال role — so no redirect happens until ال profile arrives.
+
+المصدر shows this هو a المعروف و defended-against condition:
+
+- `Mobile`'s packer layout renders a watchdog بعد 8 seconds rather than hanging.
+- Profile load failures deliberately **do لا clear an الموجود profile**, إلى avoid
+  flicker on transient errors.
+- Duplicate `SIGNED_IN` و same-user `TOKEN_REFRESHED` events هي skipped so they
+  cannot trigger repeated profile loads.
+- `Mobile`'s entry route notes that an earlier aggressive 10-second redirect تم
+  **removed** لأن it raced مع auth.
+
+ال underlying trigger هو a slow أو failing `profiles` قراءة — network, أو a
+permission/policy problem on `profiles`.
+
+### Diagnosis {#diagnosis}
+
+1. Wait لـ ال 8-second watchdog. إذا **Retry** succeeds, it تم transient.
+2. Watch ال console لـ `Loading user profile for userId:` followed بواسطة either a
+   profile أو `Error loading user profile:` مع details.
+3. Run ال built-في connectivity check — see
+   [الإعداد C2](./configuration#c2) — which يقرأ `profiles` directly.
+4. إذا ال قراءة errors rather than hangs, ال cause هو likely RLS on `profiles`.
+   Use [Live backend verification](/docs/backend/live-verification) as ال
+   baseline, then inspect ال الحالي `profiles` policies.
+
+### Resolution {#resolution}
+
+- Transient: use **Retry**.
+- Persistent: **Sign out** و back في — this clears session state و re-runs ال
+  profile load من scratch.
+- إذا يقرأ consistently fail, escalate إلى live قاعدة البيانات verification. Do لا patch
+  around it في ال client.
+
+### Do لا {#do-not}
+
+- **Do لا re-add an aggressive redirect timeout.** One existed و تم removed لـ
+  racing مع ال auth state; reinstating it reintroduces that race.
+- **Do لا clear ال profile on a transient error.** ال code intentionally keeps
+  ال last good profile; removing that causes UI flicker و loops.
+- **Do لا assume a role هو المفقود** لأن ال app has لا routed yet. Until ال
+  profile loads, neither التطبيق knows ال role.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/AuthContext.tsx" symbol="loadUserProfile" />
+- <SourceRef repo="Mobile" path="app/(packer)/_layout.tsx" symbol="profileWaitTooLong watchdog" />
+- <SourceRef repo="Mobile" path="app/index.tsx" />
+
+### Verification {#verification}
+
+ال مستخدم reaches their interface — admin group أو packer dashboard — و ال
+console shows ال profile loaded مع a role.
+
+---
+
+## A4 — Signed out unexpectedly, أو ال session سوف لا restore {#a4}
+
+### Symptoms {#symptoms}
+
+ال مستخدم هو returned إلى ال login screen without signing out, أو ال app starts
+signed out despite a previous session. Console may mention an invalid أو المفقود
+refresh token.
+
+### Likely cause {#likely-cause}
+
+Both التطبيقات defend against a corrupted stored session, which هو الدليل this
+has happened:
+
+- `Mobile`'s `getSession` inspects ال error لـ `Invalid Refresh Token` أو
+  `Refresh Token Not Found`, و إذا found **signs out و returns a null session**
+  deliberately, so a bad محلي token cannot break ال app.
+- `website` parses its stored session on module load و **removes it** إذا it lacks
+  both an access token و a refresh token, أو إذا parsing throws.
+- `Mobile` runs a session refresh monitor: it checks every **30 minutes** و
+  refreshes عندما ال session expires في under **60 minutes**.
+
+A device left offline أو suspended long enough لـ ال refresh token إلى become
+invalid produces exactly this behaviour, بواسطة design.
+
+### Diagnosis {#diagnosis}
+
+1. Check ال console لـ `Invalid Refresh Token` / `Refresh Token Not Found`, أو
+   `Clearing invalid auth session from storage` / `Clearing corrupted auth session
+   من storage` on `website`.
+2. تأكيد which Storage key هو في play — ال two التطبيقات هي independent:
+
+   | التطبيق | Storage | Key |
+   | --- | --- | --- |
+   | `Mobile` | AsyncStorage | `ipac-operations-auth-v2` |
+   | `website` | `localStorage` | `ipac-admin-auth` |
+
+3. إذا only one التطبيق هو affected, this هو محلي session state, لا an account
+   problem.
+
+### Resolution {#resolution}
+
+Sign في again. ال clearing behaviour هو intentional recovery, لا a bug.
+
+إذا it recurs لـ one مستخدم repeatedly, capture ال console output قبل signing في
+again — ال distinction between a refresh-token expiry و a profile-load failure
+([A3](#a3)) هو only visible there.
+
+### Do لا {#do-not}
+
+- **Do لا clear Storage لـ both التطبيقات** إلى "reset auth". They use separate
+  keys on purpose; signing a مستخدم out من ال field التطبيق إلى fix a web problem
+  هو a real operational cost.
+- **Do لا remove ال corrupted-session handling.** It exists لأن a bad token
+  otherwise breaks ال app on launch.
+- **Do لا change ال auth Storage key** casually — it signs every الموجود مستخدم
+  out. ال `-v2` suffix on Mobile's key suggests this has already happened once.
+
+### Related ملفات {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="auth.getSession" />
+- <SourceRef repo="Mobile" path="utils/AuthContext.tsx" symbol="setupSessionRefresh" />
+- <SourceRef repo="website" path="src/lib/supabase.ts" />
+
+### Verification {#verification}
+
+ال مستخدم signs في و ال session survives an app restart.
+

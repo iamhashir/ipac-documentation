@@ -1,0 +1,352 @@
+---
+title: "Dépannage de configuration"
+sidebar_label: "Configuration"
+description: "Diagnostiquer variables, réseau, webhooks et environnement."
+---
+
+# Configuration dépannage {#configuration-troubleshooting}
+
+Problems where le code est fine et le configuration est ne.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:app.json',
+    'Mobile:components/debug/NetworkTest.tsx',
+    'Mobile:WARP.md',
+    'Mobile:.nvmrc',
+    'website:.github/workflows/',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'website:server/api/webhooks/resend/inbound.post.ts',
+  ]}>
+  All entries sont lu directly depuis configuration et source. **Non live base de données ou
+  Supabase dashboard access a été utilisé**, et every entry here est diagnosable without it.
+</Status>
+
+---
+
+## C1 — Editing `.env` has non effect on Mobile {#c1}
+
+### Symptoms {#symptoms}
+
+You set `EXPO_PUBLIC_SUPABASE_URL` dans `Mobile/.env` vers point at a différent Supabase
+project, restart, et le app still connects vers le original one. le change appears
+vers be ignored — parce que it est.
+
+### Likely cause {#likely-cause}
+
+**`app.json` takes precedence, et it ships real values.** le client lit
+`Constants.expoConfig.extra.supabaseUrl` first et `process.env.EXPO_PUBLIC_SUPABASE_URL`
+only as a fallback — so parce que `app.json` carries both Supabase values, le fallback
+est **never reached**.
+
+le exact resolution order est documented once, dans
+[Environnement variables](/docs/guides/getting-started/environment-variables).
+
+### Diagnosis {#diagnosis}
+
+```bash
+# what app.json actually declares (keys only, no values printed)
+node -p "Object.keys(require('./app.json').expo.extra)"
+```
+
+Si `supabaseUrl` et `supabasePublishableKey` appear, `.env` est inert pour those two
+settings.
+
+### Resolution {#resolution}
+
+vers point at a différent project you doit change `app.json`, then rebuild. Expo lit
+`app.json` at build time, so a Metro restart alone est ne enough.
+
+le proper fix est vers remove le Supabase values depuis `app.json` so le
+`EXPO_PUBLIC_*` fallback becomes live — which also resolves
+[M2 dans le sécurité findings](/docs/security/findings#m2). That est a change vers
+`Mobile`, which this documentation does ne make.
+
+### Do ne {#do-not}
+
+- **Do ne add a second config chemin** dans code vers work around le precedence. Two
+  mechanisms pour one setting est le problem, ne le solution.
+- **Do ne put a secret ou service-role key dans `app.json`.** It est committed vers git.
+  le value currently there est le publishable/anon key, which est public par design —
+  a secret key dans that slot would be a serious exposure.
+- **Do ne assume `.env` est unused.** `EXPO_PUBLIC_APP_NAME` et
+  `EXPO_PUBLIC_APP_VERSION` have non `app.json` counterpart et do take effect.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" />
+- <SourceRef repo="Mobile" path="app.json" />
+- <SourceRef repo="Mobile" path=".env.example" />
+
+### Verification {#verification}
+
+le app connects vers le intended project. Note le client also logs its resolved URL
+et key vers le console on every launch, which makes this directly observable — et est
+itself a recorded finding.
+
+---
+
+## C2 — Cannot tell whether Supabase est reachable {#c2}
+
+### Symptoms {#symptoms}
+
+Data does ne load, et it est unclear whether le cause est le network, le
+configuration, authentification, ou a base de données permission.
+
+### Likely cause {#likely-cause}
+
+Any de le four — which est why le dépôt ships a diagnostic component pour
+exactly this.
+
+### Diagnosis {#diagnosis}
+
+`Mobile` contient <SourceRef repo="Mobile" path="components/debug/NetworkTest.tsx" />,
+which performs a layered check:
+
+| Test | What it proves |
+| --- | --- |
+| `select count from profiles limit 1` | le client est configured, reachable, et peut lu `profiles` |
+| `rpc('get_user_email_by_username', { lookup_username: 'test' })` | le username-login RPC exists et est callable |
+| Presence de `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Whether `.env` variables sont loaded |
+
+:::warning le environnement check dans this component peut mislead
+
+`NetworkTest` lit `process.env.EXPO_PUBLIC_*` **directly**, while le real client
+prefers `app.json` (see [C1](#c1)). So le component peut rapport
+`Environment variables missing` while le app est working perfectly, parce que le app
+est using `app.json` values that le component does ne inspect.
+
+Treat its Supabase et RPC results as authoritative, et its environnement verdict as
+informational only.
+
+:::
+
+pour `website`, le equivalent first check est whether le app throws
+`Missing Supabase environment variables` at startup — see
+[W2](./website#w2).
+
+### Resolution {#resolution}
+
+Interpret le results:
+
+- **Both tests pass** → configuration et connectivity sont fine. le problem est
+  elsewhere: authentification ([A3](./authentication#a3)) ou a table-specific
+  permission.
+- **`profiles` lu fails** → configuration, network, ou RLS on `profiles`.
+- **`profiles` lu succeeds, RPC fails** → le fonction ou its grants. Live
+  verification confirms le username lookup RPC est `SECURITY DEFINER` et
+  callable par `anon`; see
+  [M1 dans le sécurité findings](/docs/security/findings#m1).
+
+:::info Where source-based diagnosis stops
+
+Si le `profiles` lu fails avec a permission error rather than a network error,
+le cause est likely RLS. Use
+[Live backend verification](/docs/backend/live-verification) as le baseline,
+then inspect le actuel `profiles` policy bodies avant changing anything.
+
+:::
+
+### Do ne {#do-not}
+
+- **Do ne conclude le backend est down** depuis a failed lu. Distinguish a network
+  error depuis a permission error; le messages differ.
+- **Do ne leave debug components on a user-facing screen.** `NetworkTest` est a
+  developer tool.
+- **Do ne run écrit tests against production vers "check connectivity."** Read-only par
+  default, per le dépôt own base de données safety policy.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="components/debug/NetworkTest.tsx" />
+- <SourceRef repo="Mobile" path="utils/api/supabase.ts" />
+
+### Verification {#verification}
+
+Both diagnostic tests rapport success, et le failing screen loads.
+
+---
+
+## C3 — Setup instructions reference fichiers that do ne exist {#c3}
+
+### Symptoms {#symptoms}
+
+You follow a setup document, reach a step that names a fichier, et le fichier est ne
+there.
+
+### Likely cause {#likely-cause}
+
+Two vérifié cases. Both sont stale instructions dans le application dépôts, ne
+mistakes on your part.
+
+**`Mobile/WARP.md`** — its "Base de données Setup" section says:
+
+```text
+3. Run database setup from `docs/complete-database-setup.sql` in Supabase SQL Editor
+4. Apply RLS policies from `docs/supabase-rls-policies.sql`
+```
+
+**`Mobile` has non `docs/` directory.** Neither fichier exists. le only SQL dans le
+dépôt est one migration under `supabase/migrations/` et an ad-hoc
+`scripts/fix-unit-names.sql`.
+
+**`website/CLAUDE.md`** — instructs contributors vers consult a `.docs/` reference set
+(data flow, base de données schema, query patterns, component architecture, input
+validation, CI/CD setup) et vers append every task vers `.docs/engineering-worklog.md`.
+**Non `.docs/` directory exists.** Tracked as
+[OQ-004](/docs/reference/open-questions#oq-004).
+
+### Diagnosis {#diagnosis}
+
+```bash
+ls Mobile/docs 2>&1        # No such file or directory
+ls website/.docs 2>&1      # No such file or directory
+```
+
+### Resolution {#resolution}
+
+Use le sources that do exist:
+
+- **Base de données setup:** there est non runnable setup script. le base de données est **ne
+  reproducible depuis le dépôts** — one migration covers 67 live tables. See
+  [Schema provenance](/docs/backend/schema-provenance).
+- **Development conventions:** `website/CLAUDE.md` et `website/AGENTS.md` sont actuel
+  et useful pour everything except le `.docs/` references. `AGENTS.md` dans particular
+  carries a real Base de données Safety policy et change process.
+- **Setup steps:** use [Getting started](/docs/guides/getting-started/overview) on
+  this site, which a été written against what est actually dans le dépôts.
+
+### Do ne {#do-not}
+
+- **Do ne go looking pour those SQL fichiers** dans old branches ou zip archives on le
+  assumption they sont authoritative. Even si found, they would predate le actuel
+  schema par an inconnu margin.
+- **Do ne run any recovered setup SQL against le partagé project.** It est le live
+  production base de données pour both applications.
+- **Do ne treat le `.docs/` worklog protocol as an active requirement.** It cannot
+  be satisfied.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="WARP.md" />
+- <SourceRef repo="website" path="CLAUDE.md" />
+- <SourceRef repo="website" path="AGENTS.md" />
+
+### Verification {#verification}
+
+You peut complete local setup pour both applications without le manquant fichiers —
+[Getting started](/docs/guides/getting-started/overview) does ne depend on them.
+
+---
+
+## C4 — Which service-role variable est actually dans use? {#c4}
+
+### Symptoms {#symptoms}
+
+A server-side ou Edge Function feature fails avec a credentials error, ou you need vers
+rotate a key et cannot tell which variable name est live.
+
+### Likely cause {#likely-cause}
+
+**Both privileged code chemins accept several names pour le même secret**, so le
+authoritative one est ambiguous:
+
+| Code chemin | Resolution order |
+| --- | --- |
+| `create-user` Edge Function | `SUPABASE_SERVICE_ROLE_KEY` → `SERVICE_ROLE_KEY` → `AUTH_SECRET_KEY` |
+| Resend inbound webhook | `SUPABASE_SECRET_KEY` → `SUPABASE_SERVICE_ROLE_KEY` |
+
+le Edge Function returns
+`Server misconfiguration: missing service role key` quand none est set.
+
+### Diagnosis {#diagnosis}
+
+Check which names sont set dans each environnement — le Supabase Edge Function secrets
+pour le fonction, et le Vercel project environnement pour le webhook. **Print names,
+never values.**
+
+le consequence vers internalise: **you cannot prove a key has been rotated** without
+checking every name dans every environnement. A stale value under a fallback name keeps
+working silently.
+
+### Resolution {#resolution}
+
+Set le preferred name pour each chemin et confirmer le others sont unset, so behaviour est
+deterministic. Consolidating onto one name per chemin est a change vers le application
+dépôts, which this documentation does ne make. Recorded as
+[M7](/docs/security/findings#m7).
+
+### Do ne {#do-not}
+
+- **Do ne put any de these dans a `VITE_` ou `EXPO_PUBLIC_` variable.** They would ship
+  vers le client. A service-role key bypasses RLS entirely.
+- **Do ne paste a key into a ticket, log, chat, ou an AI prompt.** Pasting into a
+  prompt est disclosure.
+- **Do ne rotate par setting a new name** et leaving le old one populated.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="supabase/functions/create-user/index.ts" />
+- <SourceRef repo="website" path="server/api/webhooks/resend/inbound.post.ts" />
+
+### Verification {#verification}
+
+Privileged operations succeed avec exactly one variable name set per chemin.
+
+---
+
+## C5 — Node version mismatch {#c5}
+
+### Symptoms {#symptoms}
+
+An install ou build behaves differently between machines, ou between local et CI.
+
+### Likely cause {#likely-cause}
+
+Three différent Node versions sont declared across le two applications:
+
+| Source | Version |
+| --- | --- |
+| `Mobile/.nvmrc` | 22.19.0 |
+| `website` PR validation workflow | 22.x |
+| `website` production workflow | **24.x** |
+
+`website` therefore validates pull requests on one major et builds production on
+another. See [W4](./website#w4).
+
+### Diagnosis {#diagnosis}
+
+```bash
+node -v
+cat Mobile/.nvmrc                                       # 22.19.0
+grep NODE_VERSION website/.github/workflows/*.yml       # 22.x and 24.x
+```
+
+### Resolution {#resolution}
+
+`Mobile` carries a `.nvmrc`, so `nvm use` dans that directory selects le right version.
+`website` has **non `.nvmrc`** — match le workflow you care about, et prefer 24.x
+quand reproducing a production build failure.
+
+Choosing one version per application est a decision, tracked as
+[OQ-006](/docs/reference/open-questions#oq-006).
+
+### Do ne {#do-not}
+
+- **Do ne assume your local Node matches production.** pour `website` it very likely
+  does ne.
+- **Do ne commit a `package-lock.json` regenerated on a différent Node major** while
+  investigating something unrelated.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path=".nvmrc" />
+- <SourceRef repo="website" path=".github/workflows/ci-cd.yml" />
+
+### Verification {#verification}
+
+`node -v` matches le version utilisé par le pipeline you sont reproducing.
+

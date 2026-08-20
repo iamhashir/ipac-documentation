@@ -5,12 +5,15 @@
   "description": "Engineering knowledge base for the IPAC operations system",
   "scripts": {
     "generate:status": "node scripts/generate-doc-status.mjs",
-    "start": "npm run generate:status && docusaurus start",
-    "build": "npm run generate:status && docusaurus build",
+    "generate:i18n": "node scripts/generate-i18n-content.mjs",
+    "check:i18n": "node scripts/check-i18n-completeness.mjs",
+    "validate:i18n": "npm run generate:i18n && npm run check:i18n",
+    "start": "npm run generate:status && npm run generate:i18n && IPAC_DOCS_DEV_SERVER=1 docusaurus start",
+    "build": "npm run generate:status && npm run generate:i18n && docusaurus build",
     "serve": "docusaurus serve",
     "clear": "docusaurus clear",
     "typecheck": "npm run generate:status && tsc --noEmit",
-    "validate": "npm run typecheck && npm run build",
+    "validate": "npm run typecheck && npm run validate:i18n && npm run build",
     "write-heading-ids": "docusaurus write-heading-ids"
   },
   "dependencies": {

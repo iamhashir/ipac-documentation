@@ -36,6 +36,14 @@ function docId(file) {
   return relative(docsRoot, file).replace(/\.(md|mdx)$/, '');
 }
 
+function readStatusSources(statusTag) {
+  const sourcesMatch = statusTag.match(/sources=\{\[([\s\S]*?)\]\}/);
+  if (!sourcesMatch) {
+    return [];
+  }
+  return Array.from(sourcesMatch[1].matchAll(/['"]([^'"]+)['"]/g)).map((match) => match[1]);
+}
+
 const docs = walk(docsRoot)
   .sort()
   .map((file) => {
@@ -53,6 +61,7 @@ const docs = walk(docsRoot)
       title: frontMatter.title || docId(file),
       type: statusMatch[1],
       date: dateMatch?.[1] ?? null,
+      sources: readStatusSources(statusMatch[0]),
     };
   });
 
@@ -69,6 +78,24 @@ const latestLive = docs
   .map((doc) => doc.date)
   .find(Boolean);
 
+function normalizedType(doc) {
+  if (doc.type !== 'verified') {
+    return doc.type;
+  }
+  return doc.sources.some((source) => /supabase|vercel|live/i.test(source))
+    ? 'verified-live'
+    : 'verified-source';
+}
+
+const normalizedCounts = docs.reduce(
+  (acc, doc) => {
+    const type = normalizedType(doc);
+    acc[type] = (acc[type] ?? 0) + 1;
+    return acc;
+  },
+  /** @type {Record<string, number>} */ ({}),
+);
+
 mkdirSync(join(process.cwd(), 'src/generated'), {recursive: true});
 writeFileSync(
   outputFile,
@@ -80,6 +107,7 @@ export interface DocumentationStatusEntry {
   title: string;
   type: DocumentationStatusType;
   date: string | null;
+  sources: readonly string[];
 }
 
 export const documentationStatus = ${JSON.stringify(docs, null, 2)} as const satisfies readonly DocumentationStatusEntry[];
@@ -87,6 +115,8 @@ export const documentationStatus = ${JSON.stringify(docs, null, 2)} as const sat
 export const documentationStatusSummary = {
   total: ${docs.length},
   verified: ${counts.verified ?? 0},
+  verifiedLive: ${normalizedCounts['verified-live'] ?? 0},
+  verifiedSource: ${normalizedCounts['verified-source'] ?? 0},
   partial: ${counts.partial ?? 0},
   openQuestion: ${counts['open-question'] ?? 0},
   latestLiveBackendVerification: ${JSON.stringify(latestLive ?? null)},

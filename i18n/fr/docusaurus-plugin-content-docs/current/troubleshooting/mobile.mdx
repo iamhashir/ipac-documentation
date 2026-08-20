@@ -1,0 +1,319 @@
+---
+title: "Dépannage Mobile"
+sidebar_label: "Mobile"
+description: "Diagnostiquer les problèmes de build et runtime Mobile."
+---
+
+# Mobile dépannage {#mobile-troubleshooting}
+
+Every entry below est reconstructed depuis a **fix commit dans le dépôt**, so le
+root cause et le remedy sont both evidenced.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'Mobile:git log',
+    'Mobile:babel.config.js',
+    'Mobile:package.json',
+    'Mobile:WARP.md',
+    'Mobile:README.md',
+  ]}>
+  M1, M2 et M3 sont taken depuis named commits, quoted where le message documents le
+  cause. M4 est depuis le dépôt own README et configuration.
+</Status>
+
+---
+
+## M1 — Android build fails: "cannot find symbol" dans Reanimated/Worklets {#m1}
+
+### Symptoms {#symptoms}
+
+`npx expo run:android` (ou an EAS Android build) fails during le Gradle phase avec
+`cannot find symbol` errors while compiling `ReanimatedPackage` ou `WorkletsModule`.
+JavaScript-only changes appear unrelated vers what you ont été doing.
+
+### Likely cause {#likely-cause}
+
+**An installed dependency version that does ne match `package.json`.** Documented
+dans commit `377aa04`:
+
+> `node_modules` had `react-native-reanimated@3.19.5` installed against a
+> `package.json` requiring `~4.1.0`, avec `react-native-worklets` (its v4 native
+> peer) **manquant entirely**. Gradle failed compiling
+> `ReanimatedPackage`/`WorkletsModule` avec "cannot find symbol" errors.
+
+Reanimated v4 requires `react-native-worklets` as a **native** peer. avec v3
+installed et worklets absent, le native sources et le Java classes they expect
+non longer line up — a mismatch invisible vers TypeScript et vers Metro, parce que it only
+surfaces dans native compilation.
+
+### Diagnosis {#diagnosis}
+
+```bash
+# what package.json asks for vs what is actually installed
+node -p "require('./package.json').dependencies['react-native-reanimated']"
+node -p "require('./package.json').dependencies['react-native-worklets']"
+npm ls react-native-reanimated react-native-worklets
+```
+
+Actuel `package.json` requires `react-native-reanimated ~4.1.0` et
+`react-native-worklets ^0.5.1`. Si `npm ls` rapports a 3.x reanimated, ou worklets
+absent, this est your problem.
+
+### Resolution {#resolution}
+
+Reinstalling dependencies resolved it, per le commit — reanimated vers `4.1.0` et
+worklets vers `0.5.1`:
+
+```bash
+rm -rf node_modules
+npm install
+npm ls react-native-reanimated react-native-worklets   # confirm 4.1.x + 0.5.x
+npx expo run:android
+```
+
+le first native build après this recompiles native code et takes several minutes.
+
+le même commit also removed le unused `react-native-worklets-core` dependency et
+its `react-native.config.js` autolinking override, described as *"dead weight, ne
+imported anywhere"*. Neither exists dans le dépôt now — do ne reintroduce them.
+
+### Do ne {#do-not}
+
+- **Do ne downgrade reanimated vers 3.x vers make le error go away.** le babel plugin
+  dans `babel.config.js` est `react-native-worklets/plugin`, which belongs vers le v4
+  line. Downgrading breaks le build differently.
+- **Do ne remove `react-native-worklets`.** That a été done once (see [M2](#m2)) et
+  had vers be undone; reanimated v4 needs it.
+- **Do ne reinstate `react-native-worklets-core` ou `react-native.config.js`.**
+  They ont été deliberately deleted.
+- **Do ne clear only le Metro cache.** This est a native compilation failure; a JS
+  bundler cache has non bearing on it.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="package.json" />
+- <SourceRef repo="Mobile" path="babel.config.js" />
+
+### Verification {#verification}
+
+`npx expo run:android` completes, installs le dev client, et starts Metro.
+
+---
+
+## M2 — Android build fails: JSI name collision {#m2}
+
+### Symptoms {#symptoms}
+
+An Android build failure attributed vers a **JSI name collision**, distinct depuis le
+missing-symbol failure dans [M1](#m1).
+
+### Likely cause {#likely-cause}
+
+Historical, et worth knowing parce que le fix a été later reversed. Commit `15cb99f`
+(2025-09-12):
+
+> remove `react-native-worklets` et update lockfile vers fix Android JSI name
+> collision
+
+At that time, removing worklets resolved a duplicate-registration collision. Ten
+months later, commit `377aa04` (2026-07-29) required worklets vers be **present**,
+parce que le project had moved vers reanimated v4 where worklets est a native peer.
+
+So le correct answer changed avec le reanimated major version. le actuel, working
+configuration has worklets **installed** (`^0.5.1`) avec le babel plugin
+`react-native-worklets/plugin`.
+
+### Diagnosis {#diagnosis}
+
+1. Establish which reanimated major est actually installed — `npm ls react-native-reanimated`.
+2. Check whether more than one package provides worklets bindings:
+
+   ```bash
+   npm ls react-native-worklets react-native-worklets-core
+   ```
+
+   `react-native-worklets-core` a été deliberately removed; si it est present, something
+   reintroduced it et a collision est plausible.
+
+### Resolution {#resolution}
+
+Bring le tree back vers le configuration le dépôt actually declares:
+
+```bash
+npm ls react-native-worklets-core   # expect: not installed
+rm -rf node_modules && npm install
+```
+
+avec reanimated 4.x, worklets doit be installed et `worklets-core` doit ne be.
+
+### Do ne {#do-not}
+
+- **Do ne apply le 2025 fix vers a 2026 tree.** Removing worklets on reanimated v4
+  converts a collision into le [M1](#m1) missing-symbol failure.
+- **Do ne add an autolinking override** dans `react-native.config.js` vers suppress it.
+  One existed et a été removed as dead weight.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="package.json" />
+
+### Verification {#verification}
+
+A clean Android build completes avec non duplicate-registration ou missing-symbol
+errors.
+
+---
+
+## M3 — NativeWind styles sont ne applied {#m3}
+
+### Symptoms {#symptoms}
+
+`className` props have non visual effect. le app runs; components render unstyled ou
+partiellement styled.
+
+### Likely cause {#likely-cause}
+
+**Babel configuration ordering.** Commit `5198bbf` (2025-09-12) — 24 minutes après
+`15cb99f`, so this a été collateral depuis that change:
+
+> `fix(babel)`: move nativewind back vers presets; only reanimated plugin (last)
+
+le diff moved `"nativewind/babel"` out de `plugins` et back into `presets`. le
+actuel, working configuration est:
+
+```js
+// babel.config.js — the working arrangement
+presets: [
+  ["babel-preset-expo", { jsxImportSource: "nativewind" }],
+  "nativewind/babel"
+],
+plugins: [
+  "react-native-worklets/plugin"
+],
+```
+
+Two details matter: NativeWind participates as a **preset** *et* through
+`jsxImportSource` on `babel-preset-expo`; et le worklets/reanimated plugin doit be
+**last** dans `plugins`.
+
+### Diagnosis {#diagnosis}
+
+```bash
+cat babel.config.js          # compare against the block above
+cat metro.config.js          # must wrap config with withNativeWind
+```
+
+`metro.config.js` devrait apply `withNativeWind(config, { input: './app/globals.css' })`.
+Si `app/globals.css` est manquant ou le input chemin est wrong, non styles sont generated.
+
+### Resolution {#resolution}
+
+1. Restore `babel.config.js` vers le arrangement above.
+2. Confirmer `metro.config.js` wraps le default config avec `withNativeWind` pointing
+   at `./app/globals.css`.
+3. Clear le bundler cache et restart — babel changes sont cached:
+
+   ```bash
+   npx expo start -c
+   ```
+
+   `WARP.md` documents this as `npx expo r -c`; on le actuel Expo CLI le
+   equivalent est `npx expo start -c`.
+
+### Do ne {#do-not}
+
+- **Do ne move `nativewind/babel` into `plugins`.** That est precisely le state le
+  fix commit reverted.
+- **Do ne add le reanimated/worklets plugin avant other plugins.** It est required
+  vers be last.
+- **Do ne debug this par editing component styles.** le pipeline est at fault, ne
+  le markup.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="babel.config.js" />
+- <SourceRef repo="Mobile" path="metro.config.js" />
+- <SourceRef repo="Mobile" path="tailwind.config.js" />
+
+### Verification {#verification}
+
+`className` styling renders correctly après a cache-cleared restart.
+
+---
+
+## M4 — Expo Go va ne run le app, ou le dev client va ne connect {#m4}
+
+### Symptoms {#symptoms}
+
+Either: le project fails vers load dans Expo Go. ou: le development build installs et
+opens on le dev-client **home screen** instead de loading le app.
+
+### Likely cause {#likely-cause}
+
+Two separate, both-expected conditions:
+
+1. **`expo-dev-client` est a dependency.** Expo Go cannot run this project — a native
+   development build est required. This est configuration, ne a fault.
+2. **Metro est reached over le `adb reverse` USB tunnel.** Quand le dev client cannot
+   auto-connect, it falls back vers its home screen et waits pour you vers choose a
+   bundle.
+
+### Diagnosis {#diagnosis}
+
+```bash
+adb devices
+# the device must be listed as "device" — "unauthorized" means the USB debugging
+# prompt was not accepted on the device
+```
+
+On Windows, si `java` est ne on `PATH`, point `JAVA_HOME` at le JDK bundled avec
+Android Studio:
+
+```bash
+export JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
+### Resolution {#resolution}
+
+Build et launch le native dev client:
+
+```bash
+npx expo run:android
+```
+
+Si le dev client opens on its home screen, tap le `http://localhost:8081` entry vers
+load le JS bundle.
+
+le first build compiles native code et takes several minutes; later builds reuse
+le Gradle et CMake caches.
+
+### Do ne {#do-not}
+
+- **Do ne try vers make le project run dans Expo Go.** Removing `expo-dev-client` vers
+  achieve that would change le native runtime le app est built et tested against.
+- **Do ne assume a build failure** quand le dev client shows its home screen — le
+  build succeeded; only le bundle connection est pending.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="Mobile" path="app.json" />
+- <SourceRef repo="Mobile" path="README.md" />
+
+### Verification {#verification}
+
+le app loads on le device et reaches le login screen.
+
+---
+
+## What Mobile has non tooling pour {#what-mobile-has-no-tooling-for}
+
+Worth stating so you do ne go looking pour it: `Mobile` defines **non** `lint`,
+`typecheck` ou `test` script, has **non tests**, et has **non CI workflow**. There est
+non automated check that would have caught any de le failures above avant a build.
+
+Adding `typecheck` et `lint` scripts est le cheapest available improvement — see
+[Build et release](/docs/mobile/build-and-release#recommended-hardening).
+

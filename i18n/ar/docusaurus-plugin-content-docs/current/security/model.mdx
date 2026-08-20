@@ -1,0 +1,23 @@
+---
+title: نموذج الأمان
+sidebar_label: النموذج
+description: حدود التفويض ونموذج الأمان في IPAC.
+---
+
+<header>
+# نموذج الأمان
+</header>
+
+<Status type="verified" date="2026-08-19">
+  تبقى المصطلحات RLS وAuth وStorage وRPC وEdge Function كما هي.
+</Status>
+
+يعتمد نموذج أمان IPAC على عدة طبقات:
+
+- Supabase Auth يحدد المستخدم.
+- roles التطبيق تتحكم بواجهات website وMobile.
+- RLS يجب أن تحمي البيانات داخل PostgreSQL.
+- Storage وEdge Function تحتاجان تحقق منفصل.
+
+الخطر الرئيسي هو تكرار authorization عبر عدة طبقات. أي تغيير في role أو RLS أو route guard أو privileged function يعامل كتغيير HIGH risk.
+

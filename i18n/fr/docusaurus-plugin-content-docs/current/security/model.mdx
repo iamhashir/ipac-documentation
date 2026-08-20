@@ -1,0 +1,25 @@
+---
+title: Modèle de sécurité
+sidebar_label: Modèle
+description: Limites d autorisation et modèle de sécurité IPAC.
+---
+
+<header>
+# Modèle de sécurité
+</header>
+
+<Status type="verified" date="2026-08-19">
+  Les termes RLS, Auth, Storage, RPC et Edge Function restent inchangés.
+</Status>
+
+Le modèle de sécurité IPAC repose sur plusieurs couches :
+
+- Supabase Auth identifie l utilisateur.
+- Les rôles applicatifs contrôlent les surfaces website et Mobile.
+- RLS doit protéger les données dans PostgreSQL.
+- Storage et Edge Function nécessitent une vérification séparée.
+
+## Risque principal
+
+L autorisation est dupliquée entre plusieurs couches. Une modification de role, RLS, route guard ou fonction privilégiée doit être testée comme changement HIGH risk.
+

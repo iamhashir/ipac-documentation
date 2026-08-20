@@ -130,6 +130,12 @@ html[data-theme='dark'] {
   overflow-x: auto;
 }
 
+.markdown table code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @media (min-width: 997px) {
   .markdown table {
     width: 100%;
@@ -163,6 +169,45 @@ html[data-theme='dark'] {
   padding: 1rem;
 }
 
+[dir='rtl'] .theme-doc-markdown,
+[dir='rtl'] .theme-doc-sidebar-container,
+[dir='rtl'] .table-of-contents,
+[dir='rtl'] .breadcrumbs,
+[dir='rtl'] .navbar,
+[dir='rtl'] .footer {
+  text-align: start;
+}
+
+[dir='rtl'] .theme-code-block,
+[dir='rtl'] .theme-code-block pre,
+[dir='rtl'] .theme-code-block code,
+[dir='rtl'] .docusaurus-mermaid-container,
+[dir='rtl'] .markdown code,
+[dir='rtl'] .markdown pre,
+[dir='rtl'] .markdown kbd,
+[dir='rtl'] .markdown samp {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+}
+
+[dir='rtl'] .markdown table code,
+[dir='rtl'] .markdown a[href^='http'],
+[dir='rtl'] .markdown a[href^='/docs'],
+[dir='rtl'] .navbar-github-link,
+[dir='rtl'] .navbar__search-input {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+[dir='rtl'] .dropdown__menu {
+  text-align: right;
+}
+
+[dir='rtl'] .navbar__search-input {
+  text-align: left;
+}
+
 .navbar-github-link:hover {
   opacity: 0.75;
 }
@@ -178,6 +223,22 @@ html[data-theme='dark'] {
   background-color: var(--ipac-surface-raised);
   color: var(--ifm-font-color-base);
   min-height: 2.15rem;
+}
+
+.ipac-dev-search-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.15rem;
+  max-width: 18rem;
+  border: 1px solid var(--ipac-border);
+  border-radius: 6px;
+  background: var(--ipac-surface-raised);
+  color: var(--ipac-muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.25;
+  padding: 0 0.75rem;
+  white-space: normal;
 }
 
 @media (max-width: 996px) {

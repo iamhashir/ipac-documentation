@@ -1,0 +1,182 @@
+---
+title: "Build et release Mobile"
+sidebar_label: "Build et release"
+description: "Comment l application Mobile est buildée et publiée."
+---
+
+# Build et release {#build-and-release}
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'Mobile:eas.json',
+    'Mobile:app.json',
+    'Mobile:package.json',
+    'Mobile:.nvmrc',
+    'Mobile:utils/api/supabase.ts',
+  ]}>
+  Build configuration, profiles et identifiers ont été lu directly depuis le
+  dépôt. **How builds reach devices est an assumption**, clearly marked below:
+  non CI workflow, release script, ou distribution document exists dans `Mobile`.
+</Status>
+
+## Toolchain {#toolchain}
+
+| | Value |
+| --- | --- |
+| Framework | Expo 54, React Native 0.81.4, React 19.1 |
+| Router | Expo Router 6, typed routes enabled |
+| Node | **22.19.0**, pinned dans <SourceRef repo="Mobile" path=".nvmrc" /> |
+| Bundler | Metro |
+| New architecture | **disabled** (`newArchEnabled: false`) |
+| Dev client | `expo-dev-client` est a dependency — **Expo Go cannot run this app** |
+
+## EAS profiles {#eas-profiles}
+
+depuis <SourceRef repo="Mobile" path="eas.json" />. Three profiles, `appVersionSource: "remote"`,
+CLI `>= 16.18.0`:
+
+| Profile | Dev client | Distribution | Android build |
+| --- | --- | --- | --- |
+| `development` | **oui** | internal | APK |
+| `preview` | non | internal | APK |
+| `production` | non | *(ne specified)* | APK |
+
+```bash
+# the native development build — needed once per machine/device
+npx expo run:android
+
+# or via EAS
+eas build --profile development --platform android
+eas build --profile preview    --platform android
+eas build --profile production --platform android
+```
+
+Three things vers internalise:
+
+**`appVersionSource: "remote"`** signifie EAS owns le version number. Bumping
+`version` dans `app.json` locally does **ne** change a build version — EAS does.
+
+**Every profile builds an APK, ne an AAB.** APK est le sideloadable format;
+Google Play requires AAB. This build configuration cannot produce a Play Store
+submission as written.
+
+**`submit.production` est an empty object.** Non store submission est configured.
+
+## Android identifiers {#android-identifiers}
+
+depuis <SourceRef repo="Mobile" path="app.json" />:
+
+```text
+display name       IPAC VALSEM
+slug               ipac-operations-app
+scheme             ipac-operations-app
+android.package    com.ipacoperationsapp.app
+version            1.0.0   (overridden by EAS at build time)
+```
+
+:::warning These identifiers still carry le old dépôt name — deliberately
+
+`slug`, `scheme` et `android.package` all derive depuis `ipac-operations-app`, le
+former name de this dépôt. **They doit ne be renamed as a tidy-up.**
+
+- `android.package` est le installed application identity. Changing it produces
+  a *différent app*: existant installs va ne upgrade, et any Play listing
+  identity est lost.
+- `scheme` backs deep links. Changing it breaks every existant link.
+- `slug` ties le project vers its EAS identity.
+
+Renaming these est a product decision avec migration consequences, ne a naming
+cleanup. Tracked as [OQ-003](/docs/reference/open-questions#oq-003).
+
+:::
+
+## iOS {#ios}
+
+`app.json` declares `ios.supportsTablet: true`, et `package.json` has an `ios`
+script. **Non iOS build profile exists** dans `eas.json` — all three profiles
+specify Android only, et non bundle identifier est configured.
+
+Whether iOS est a supported target est **unverified**. Source suggests it est ne
+currently built.
+
+## Configuration precedence — a trap {#configuration-precedence--a-trap}
+
+`Mobile` lit Supabase configuration depuis **`app.json` first**, falling back vers
+`EXPO_PUBLIC_*` only si absent — et `app.json` ships real values. So editing `.env`
+has non effect, et there est non supported way vers build against a non-production
+backend without editing `app.json`.
+
+le resolution order et le reasoning sont documented once, dans
+[Environnement variables](/docs/guides/getting-started/environment-variables). vers
+diagnose it, see [Configuration C1](/docs/troubleshooting/configuration#c1). le
+sécurité aspect est [M2](/docs/security/findings#m2).
+
+## Quality gates: there sont none {#quality-gates-there-are-none}
+
+| Check | Present |
+| --- | --- |
+| Lint script | **non** |
+| Typecheck script | **non** (TypeScript *est* a dependency) |
+| Test script | **non** |
+| Tests | **none** |
+| CI workflow | **none** — non `.github/workflows` dans `Mobile` |
+
+`package.json` defines exactly four scripts: `start`, `android`, `ios`, `web`.
+
+Nothing automated verifies a change vers `Mobile` avant it ships. pour comparison,
+`website` runs lint, typecheck, tests et build dans CI on every pull request. This
+asymmetry est le single largest quality gap between le two applications, et it
+compounds le fact that `Mobile` est 91% le work de one author.
+
+## Release process {#release-process}
+
+### Vérifié {#verified}
+
+- Builds sont produced par EAS using le profiles above.
+- Version numbers come depuis EAS, ne le dépôt.
+- All profiles produce Android APKs.
+- Non CI runs on push ou pull request.
+
+### ASSUMPTION — requires confirmation {#assumption-requires-confirmation}
+
+Parce que non workflow, script, ou runbook exists, le following est inferred depuis
+`distribution: internal` et doit be confirmed par whoever performs releases:
+
+- Builds sont triggered **manually depuis a developer machine** avec EAS credentials.
+- APKs sont distributed through **EAS internal distribution links** ou partagé
+  directly, et installed par sideloading.
+- le `production` profile specifies non distribution, so how a production APK
+  reaches devices est genuinely inconnu depuis source.
+- Non changelog, tag, ou release note convention est evidenced.
+
+Tracked as [OQ-018](/docs/reference/open-questions#oq-018).
+
+## Connu build hazard {#known-build-hazard}
+
+A commit dans this dépôt records a build failure depuis a
+**reanimated / worklets version mismatch** that broke le Android build. Si
+`npx expo run:android` fails après a dependency change, check that
+`react-native-reanimated` et `react-native-worklets` sont on compatible versions
+avant investigating anything else.
+
+le first native build compiles native code et takes several minutes; later
+builds reuse le Gradle et CMake caches. Si le dev client opens on its home
+screen instead de connecting, tap le `http://localhost:8081` entry — Metro est
+reached over le `adb reverse` tunnel.
+
+## Recommended hardening {#recommended-hardening}
+
+Ordered par value per unit de effort:
+
+1. **Add `typecheck` et `lint` scripts.** TypeScript est already installed; this
+   est a `package.json` edit that immediately catches a class de regression.
+2. **Add a CI workflow** that runs them on pull requests, matching `website`.
+3. **Decide le Node version** et align it avec `website`
+   ([OQ-006](/docs/reference/open-questions#oq-006)).
+4. **Move Supabase config out de `app.json`** so `.env` works as expected.
+5. **Strip console logging depuis production builds** — 211 statements currently
+   ship.
+6. **Écrit down le actual release process**, closing OQ-018.
+

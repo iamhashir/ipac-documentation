@@ -1,5 +1,33 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
+const CURRENT_LOCALE = process.env.DOCUSAURUS_CURRENT_LOCALE ?? 'en';
+
+const LABELS = {
+  en: {
+    gettingStarted: 'Getting started',
+    architecture: 'Architecture',
+    mobile: 'Mobile',
+    website: 'website',
+    crossAppWorkflows: 'Cross-application workflows',
+  },
+  fr: {
+    gettingStarted: 'Bien démarrer',
+    architecture: 'Architecture',
+    mobile: 'Mobile',
+    website: 'website',
+    crossAppWorkflows: 'Flux inter-applications',
+  },
+  ar: {
+    gettingStarted: 'البدء',
+    architecture: 'الهندسة',
+    mobile: 'Mobile',
+    website: 'website',
+    crossAppWorkflows: 'سير العمل بين التطبيقات',
+  },
+} as const;
+
+const labels = LABELS[CURRENT_LOCALE as keyof typeof LABELS] ?? LABELS.en;
+
 /**
  * Navigation.
  *
@@ -22,7 +50,7 @@ const sidebars: SidebarsConfig = {
     'guides/introduction',
     {
       type: 'category',
-      label: 'Getting started',
+      label: labels.gettingStarted,
       collapsed: false,
       link: { type: 'doc', id: 'guides/getting-started/overview' },
       items: [
@@ -36,7 +64,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Architecture',
+      label: labels.architecture,
       collapsed: false,
       link: { type: 'doc', id: 'guides/architecture/system-overview' },
       items: [
@@ -53,14 +81,14 @@ const sidebars: SidebarsConfig = {
   applications: [
     {
       type: 'category',
-      label: 'Mobile',
+      label: labels.mobile,
       collapsed: false,
       link: { type: 'doc', id: 'guides/architecture/mobile-architecture' },
       items: ['mobile/build-and-release'],
     },
     {
       type: 'category',
-      label: 'website',
+      label: labels.website,
       collapsed: false,
       link: { type: 'doc', id: 'guides/architecture/website-architecture' },
       items: ['website/roles-and-permissions'],
@@ -74,7 +102,7 @@ const sidebars: SidebarsConfig = {
   workflows: [
     {
       type: 'category',
-      label: 'Cross-application workflows',
+      label: labels.crossAppWorkflows,
       collapsed: false,
       link: { type: 'doc', id: 'workflows/overview' },
       items: [
@@ -103,7 +131,11 @@ const sidebars: SidebarsConfig = {
     'adr/adr-0003-report-packed-date',
   ],
 
-  reference: ['reference/documentation-status', 'reference/open-questions'],
+  reference: [
+    'reference/documentation-status',
+    'reference/terminology-glossary',
+    'reference/open-questions',
+  ],
 };
 
 export default sidebars;

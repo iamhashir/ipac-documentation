@@ -1,0 +1,59 @@
+---
+title: "المتطلبات"
+sidebar_label: "المتطلبات"
+description: "الأدوات والوصول المطلوبان قبل تشغيل IPAC محليا."
+---
+
+# Prerequisites {#prerequisites}
+
+<Status
+  type="partial"
+  date="2026-08-20"
+  sources={[
+    'Mobile:.nvmrc',
+    'Mobile:package.json',
+    'Mobile:README.md',
+    'website:package.json',
+    'website:.github/workflows/',
+    'ipac-documentation:.vercel/project.json',
+  ]}>
+  تمت قراءة متطلبات الأدوات مباشرة من ملفات الإعداد. ال
+  supported Node version remains contradictory لـ `website` و هو recorded as
+  [OQ-006](/docs/reference/open-questions#oq-006).
+</Status>
+
+## Tooling {#tooling}
+
+| Tool | Needed لـ | Notes |
+| --- | --- | --- |
+| Node.js | Both التطبيقات و docs | `Mobile` و `ipac-documentation` pin **22.19.0** في `.nvmrc`. ال Vercel docs project هو configured لـ 22.x. `website` validates pull requests on 22.x but builds الإنتاج on 24.x; see [OQ-006](/docs/reference/open-questions#oq-006). |
+| npm | Both التطبيقات | Both المستودعات commit `package-lock.json`; use npm, لا another package manager. |
+| Git | Both التطبيقات | — |
+| Android Studio | `Mobile` only | Provides ال Android SDK و a bundled JDK. Required إلى build ال native development client. |
+| Xcode | `Mobile` on iOS | ال app declares tablet support لـ iOS. iOS builds تم لا exercised while writing this page. |
+
+Using a Node version manager هو strongly advisable given ال version conflict.
+Both this documentation المستودع و `Mobile` carry a `.nvmrc`, so
+`nvm use` picks ال right version في those directories.
+
+## Accounts و access {#accounts-and-access}
+
+You سوف need:
+
+- **المستودع access.** Both التطبيقات هي في ال **`ipacapps`**
+  organisation — `ipacapps/website` و `ipacapps/Mobile`.
+- **Supabase project access.** Both التطبيقات point at ال نفس project.
+  Without it, neither التطبيق يمكن authenticate و almost nothing works.
+- **Credentials لـ محلي البيئة ملفات.** Obtain them من a team member أو
+  a secret store. They هي لا, و سوف never be, في this documentation.
+
+## What سوف لا work {#what-will-not-work}
+
+- **Expo Go سوف لا run `Mobile`.** ال project depends on
+  `expo-dev-client`, which requires a native development build. This هو ال most
+  common المصدر من lost time لـ a new developer — see
+  [`Mobile` setup](./mobile-setup).
+- **Nothing runs against a محلي قاعدة البيانات.** There هو no محلي Postgres setup في
+  either المستودع; both التطبيقات talk إلى ال مشترك hosted Supabase
+  project. Treat every محلي action as acting on مشترك infrastructure.
+

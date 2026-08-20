@@ -1,0 +1,182 @@
+---
+title: "Build وrelease لتطبيق Mobile"
+sidebar_label: "Build وrelease"
+description: "كيف يتم build ونشر تطبيق Mobile."
+---
+
+# Build و release {#build-and-release}
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'Mobile:eas.json',
+    'Mobile:app.json',
+    'Mobile:package.json',
+    'Mobile:.nvmrc',
+    'Mobile:utils/api/supabase.ts',
+  ]}>
+  Build الإعداد, profiles و identifiers تم قراءة directly من ال
+  المستودع. **How builds reach devices هو an assumption**, clearly marked below:
+  no CI workflow, release script, أو distribution document exists في `Mobile`.
+</Status>
+
+## Toolchain {#toolchain}
+
+| | Value |
+| --- | --- |
+| Framework | Expo 54, React Native 0.81.4, React 19.1 |
+| Router | Expo Router 6, typed routes enabled |
+| Node | **22.19.0**, pinned في <SourceRef repo="Mobile" path=".nvmrc" /> |
+| Bundler | Metro |
+| New الهندسة | **disabled** (`newArchEnabled: false`) |
+| Dev client | `expo-dev-client` هو a dependency — **Expo Go cannot run this app** |
+
+## EAS profiles {#eas-profiles}
+
+من <SourceRef repo="Mobile" path="eas.json" />. Three profiles, `appVersionSource: "remote"`,
+CLI `>= 16.18.0`:
+
+| Profile | Dev client | Distribution | Android build |
+| --- | --- | --- | --- |
+| `development` | **yes** | internal | APK |
+| `preview` | no | internal | APK |
+| `production` | no | *(لا specified)* | APK |
+
+```bash
+# the native development build — needed once per machine/device
+npx expo run:android
+
+# or via EAS
+eas build --profile development --platform android
+eas build --profile preview    --platform android
+eas build --profile production --platform android
+```
+
+Three things إلى internalise:
+
+**`appVersionSource: "remote"`** يعني EAS owns ال version number. Bumping
+`version` في `app.json` locally does **لا** change a build version — EAS does.
+
+**Every profile builds an APK, لا an AAB.** APK هو ال sideloadable format;
+Google Play requires AAB. This build الإعداد cannot produce a Play Store
+submission as written.
+
+**`submit.production` هو an empty object.** No store submission هو configured.
+
+## Android identifiers {#android-identifiers}
+
+من <SourceRef repo="Mobile" path="app.json" />:
+
+```text
+display name       IPAC VALSEM
+slug               ipac-operations-app
+scheme             ipac-operations-app
+android.package    com.ipacoperationsapp.app
+version            1.0.0   (overridden by EAS at build time)
+```
+
+:::warning These identifiers still carry ال old المستودع name — deliberately
+
+`slug`, `scheme` و `android.package` all derive من `ipac-operations-app`, ال
+former name من this المستودع. **They يجب لا be renamed as a tidy-up.**
+
+- `android.package` هو ال installed التطبيق identity. Changing it produces
+  a *مختلف app*: الموجود installs سوف لا upgrade, و any Play listing
+  identity هو lost.
+- `scheme` backs deep links. Changing it breaks every الموجود link.
+- `slug` ties ال project إلى its EAS identity.
+
+Renaming these هو a product decision مع migration consequences, لا a naming
+cleanup. Tracked as [OQ-003](/docs/reference/open-questions#oq-003).
+
+:::
+
+## iOS {#ios}
+
+`app.json` declares `ios.supportsTablet: true`, و `package.json` has an `ios`
+script. **No iOS build profile exists** في `eas.json` — all three profiles
+specify Android only, و no bundle identifier هو configured.
+
+Whether iOS هو a supported target هو **unverified**. المصدر suggests it هو لا
+currently built.
+
+## الإعداد precedence — a trap {#configuration-precedence--a-trap}
+
+`Mobile` يقرأ Supabase الإعداد من **`app.json` first**, falling back إلى
+`EXPO_PUBLIC_*` only إذا absent — و `app.json` ships real values. So editing `.env`
+has no effect, و there هو no supported way إلى build against a non-production
+backend without editing `app.json`.
+
+ال resolution order و ال reasoning هي documented once, في
+[البيئة variables](/docs/guides/getting-started/environment-variables). إلى
+diagnose it, see [الإعداد C1](/docs/troubleshooting/configuration#c1). ال
+الأمان aspect هو [M2](/docs/security/findings#m2).
+
+## Quality gates: there هي none {#quality-gates-there-are-none}
+
+| Check | Present |
+| --- | --- |
+| Lint script | **no** |
+| Typecheck script | **no** (TypeScript *هو* a dependency) |
+| Test script | **no** |
+| Tests | **none** |
+| CI workflow | **none** — no `.github/workflows` في `Mobile` |
+
+`package.json` defines exactly four scripts: `start`, `android`, `ios`, `web`.
+
+Nothing automated verifies a change إلى `Mobile` قبل it ships. لـ comparison,
+`website` runs lint, typecheck, tests و build في CI on every pull request. This
+asymmetry هو ال single largest quality gap between ال two التطبيقات, و it
+compounds ال fact that `Mobile` هو 91% ال work من one author.
+
+## Release process {#release-process}
+
+### تم التحقق {#verified}
+
+- Builds هي produced بواسطة EAS using ال profiles above.
+- Version numbers come من EAS, لا ال المستودع.
+- All profiles produce Android APKs.
+- No CI runs on push أو pull request.
+
+### ASSUMPTION — requires confirmation {#assumption-requires-confirmation}
+
+لأن no workflow, script, أو runbook exists, ال following هو inferred من
+`distribution: internal` و يجب be confirmed بواسطة whoever performs releases:
+
+- Builds هي triggered **manually من a developer machine** مع EAS credentials.
+- APKs هي distributed through **EAS internal distribution links** أو مشترك
+  directly, و installed بواسطة sideloading.
+- ال `production` profile specifies no distribution, so how a الإنتاج APK
+  reaches devices هو genuinely غير معروف من المصدر.
+- No changelog, tag, أو release note convention هو evidenced.
+
+Tracked as [OQ-018](/docs/reference/open-questions#oq-018).
+
+## المعروف build hazard {#known-build-hazard}
+
+A commit في this المستودع records a build failure من a
+**reanimated / worklets version mismatch** that broke ال Android build. إذا
+`npx expo run:android` fails بعد a dependency change, check that
+`react-native-reanimated` و `react-native-worklets` هي on compatible versions
+قبل investigating anything else.
+
+ال first native build compiles native code و takes several minutes; later
+builds reuse ال Gradle و CMake caches. إذا ال dev client opens on its home
+screen instead من connecting, tap ال `http://localhost:8081` entry — Metro هو
+reached over ال `adb reverse` tunnel.
+
+## Recommended hardening {#recommended-hardening}
+
+Ordered بواسطة value per unit من effort:
+
+1. **Add `typecheck` و `lint` scripts.** TypeScript هو already installed; this
+   هو a `package.json` edit that immediately catches a class من regression.
+2. **Add a CI workflow** that runs them on pull requests, matching `website`.
+3. **Decide ال Node version** و align it مع `website`
+   ([OQ-006](/docs/reference/open-questions#oq-006)).
+4. **Move Supabase config out من `app.json`** so `.env` works as expected.
+5. **Strip console logging من الإنتاج builds** — 211 statements currently
+   ship.
+6. **كتابة down ال actual release process**, closing OQ-018.
+

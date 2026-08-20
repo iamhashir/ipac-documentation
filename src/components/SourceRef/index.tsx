@@ -23,6 +23,24 @@ interface RepositoryEntry {
   ref: string;
 }
 
+interface SourceVerificationEntry {
+  reviewedRef: string;
+  latestRef: string;
+  checkedAt: string;
+}
+
+const NOTE = {
+  en: 'repository not confirmed',
+  fr: 'dépôt non confirmé',
+  ar: 'المستودع غير مؤكد',
+} as const;
+
+const STALE_NOTE = {
+  en: 'source changed since verification',
+  fr: 'source modifiée depuis la vérification',
+  ar: 'تغير المصدر منذ التحقق',
+} as const;
+
 export interface SourceRefProps {
   /** Key from `customFields.repositories` in docusaurus.config.ts. */
   repo: string;
@@ -57,11 +75,17 @@ export default function SourceRef({
   ref,
   children,
 }: SourceRefProps): ReactNode {
-  const { siteConfig } = useDocusaurusContext();
+  const { siteConfig, i18n } = useDocusaurusContext();
   const repositories = siteConfig.customFields?.repositories as
     | Record<string, RepositoryEntry>
     | undefined;
+  const sourceVerification = siteConfig.customFields?.sourceVerification as
+    | Record<string, SourceVerificationEntry>
+    | undefined;
   const entry = repositories?.[repo];
+  const verification = sourceVerification?.[repo];
+  const sourceChanged =
+    verification && verification.reviewedRef !== verification.latestRef && !ref;
 
   if (!entry) {
     // Fails the build rather than shipping a silently broken reference.
@@ -81,7 +105,7 @@ export default function SourceRef({
         </code>
         {suffix}
         <span className={styles.note} title="Canonical repository not confirmed">
-          repository not confirmed
+          {NOTE[i18n.currentLocale as keyof typeof NOTE] ?? NOTE.en}
         </span>
       </span>
     );
@@ -97,6 +121,13 @@ export default function SourceRef({
         </code>
       </a>
       {suffix}
+      {sourceChanged ? (
+        <span
+          className={styles.stale}
+          title={`${verification.reviewedRef.slice(0, 12)} → ${verification.latestRef.slice(0, 12)}`}>
+          {STALE_NOTE[i18n.currentLocale as keyof typeof STALE_NOTE] ?? STALE_NOTE.en}
+        </span>
+      ) : null}
     </span>
   );
 }

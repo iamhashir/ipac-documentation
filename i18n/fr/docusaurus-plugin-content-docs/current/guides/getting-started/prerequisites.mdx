@@ -1,0 +1,59 @@
+---
+title: "Prérequis"
+sidebar_label: "Prérequis"
+description: "Outils et accès requis avant d exécuter IPAC localement."
+---
+
+# Prerequisites {#prerequisites}
+
+<Status
+  type="partial"
+  date="2026-08-20"
+  sources={[
+    'Mobile:.nvmrc',
+    'Mobile:package.json',
+    'Mobile:README.md',
+    'website:package.json',
+    'website:.github/workflows/',
+    'ipac-documentation:.vercel/project.json',
+  ]}>
+  Les exigences d outillage ont été lues directement dans les fichiers de configuration. le
+  supported Node version remains contradictory pour `website` et est recorded as
+  [OQ-006](/docs/reference/open-questions#oq-006).
+</Status>
+
+## Tooling {#tooling}
+
+| Tool | Needed pour | Notes |
+| --- | --- | --- |
+| Node.js | Both applications et docs | `Mobile` et `ipac-documentation` pin **22.19.0** dans `.nvmrc`. le Vercel docs project est configured pour 22.x. `website` validates pull requests on 22.x but builds production on 24.x; see [OQ-006](/docs/reference/open-questions#oq-006). |
+| npm | Both applications | Both dépôts commit `package-lock.json`; use npm, ne another package manager. |
+| Git | Both applications | — |
+| Android Studio | `Mobile` only | Provides le Android SDK et a bundled JDK. Required vers build le native development client. |
+| Xcode | `Mobile` on iOS | le app declares tablet support pour iOS. iOS builds ont été ne exercised while writing this page. |
+
+Using a Node version manager est strongly advisable given le version conflict.
+Both this documentation dépôt et `Mobile` carry a `.nvmrc`, so
+`nvm use` picks le right version dans those directories.
+
+## Accounts et access {#accounts-and-access}
+
+You va need:
+
+- **Dépôt access.** Both applications sont dans le **`ipacapps`**
+  organisation — `ipacapps/website` et `ipacapps/Mobile`.
+- **Supabase project access.** Both applications point at le même project.
+  Without it, neither application peut authenticate et almost nothing works.
+- **Credentials pour local environnement fichiers.** Obtain them depuis a team member ou
+  a secret store. They sont ne, et va never be, dans this documentation.
+
+## What va ne work {#what-will-not-work}
+
+- **Expo Go va ne run `Mobile`.** le project depends on
+  `expo-dev-client`, which requires a native development build. This est le most
+  common source de lost time pour a new developer — see
+  [`Mobile` setup](./mobile-setup).
+- **Nothing runs against a local base de données.** There est non local Postgres setup dans
+  either dépôt; both applications talk vers le partagé hosted Supabase
+  project. Treat every local action as acting on partagé infrastructure.
+

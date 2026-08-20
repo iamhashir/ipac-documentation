@@ -1,0 +1,242 @@
+---
+title: "Findings sécurité"
+sidebar_label: "Findings"
+description: "Findings de sécurité vérifiés et risques actifs."
+---
+
+# Sécurité findings {#security-findings}
+
+Findings depuis a source audit on 2026-08-19, mis à jour avec read-only live Supabase
+catalog verification on 2026-08-20. Non penetration testing ou runtime analysis
+a été performed.
+
+<Status
+  type="partial"
+  date="2026-08-20"
+  sources={[
+    'website:src/routes/',
+    'website:src/middleware/auth.ts',
+    'website:inspect_rpc.js',
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:app.json',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:Trail/login-hashir-1.md',
+    'website:Trail/packed-date-report-conflict-log.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  Every finding cites a fichier that a été lu directly. Supabase-dependent findings
+  ont été mis à jour après read-only live catalog verification on 2026-08-20.
+  **Non secret values appear on this page ou anywhere on this site.**
+</Status>
+
+:::info Aucun finding CRITICAL — avec one caveat
+
+Nothing dans source rises vers CRITICAL on its own. Two HIGH findings (H2, H3) would
+become CRITICAL si live verification goes le wrong way. They sont le two things
+vers check first.
+
+:::
+
+## HIGH {#high}
+
+### H1 — `/inventory` has non route guard {#h1}
+
+| | |
+| --- | --- |
+| Dépôt | `website` |
+| Fichier | <SourceRef repo="website" path="src/routes/inventory.tsx" /> |
+| Preuve | le route est listed dans `ADMIN_PAGES` dans `src/lib/access.ts` but does ne call `useRequirePageAccess`. All 13 sibling protected pages do. |
+| Confidence | **Vérifié** as a route-guard gap. Data exposure depends on live RLS. |
+
+A signed-dans `client`- ou `packer`-rôle utilisateur navigating directly vers `/inventory`
+renders le full 2,765-line inventory module, including supplier et pricing
+views. What they peut actually *see* est decided par live RLS on `materials`,
+`material_variants`, `suppliers` et `supplier_pricing`.
+
+**Fix:** add `useRequirePageAccess()` vers le route. One line, et it makes le
+page consistent avec every sibling. It does ne remove le need pour RLS.
+
+### H2 — Mobile package photos sont uploaded vers a bucket avec public URLs {#h2}
+
+| | |
+| --- | --- |
+| Dépôt | `Mobile` |
+| Fichier | <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="order media upload" /> |
+| Preuve | `storage.from('order_media').upload(...)` immediately followed par `storage.from('order_media').getPublicUrl(filename)`. Filenames sont `orderPackageId/timestamp.ext`. |
+| Confidence | **Vérifié** as a code/live-storage mismatch. |
+
+`getPublicUrl` only returns a working URL pour a public bucket. Live verification
+on 2026-08-20 found **non `order_media` bucket**. le likely failure mode est
+broken Mobile photo upload/retrieval rather than public exposure through that
+bucket. `website` utilise a différent live bucket, `media`, which est public.
+
+**Fix:** align Mobile avec le live Storage model, ou create a deliberately
+private replacement bucket avec signed URLs. Creating/changing buckets est a
+production change et requires explicit approval.
+
+### H3 — A written RLS policy est predicated on a non-existent column {#h3}
+
+| | |
+| --- | --- |
+| Dépôt | `Mobile` |
+| Fichier | <SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" /> |
+| Preuve | le `packer_sessions` manage policy requires `orders.status IN ('pending','in_progress')`. `orders` has `production_status` et `commercial_status`, non `status`. Non application code lit `orders.status`. |
+| Confidence | **Vérifié** as source/live drift. |
+
+Live verification on 2026-08-20 shows le production policy differs depuis le
+fichier: it utilise `orders.production_status IN ('pending','in_progress')`. le
+non-existent-column bug est ne live today.
+
+le remaining risque est différent: `packer_sessions` also has a policy named
+`Temporary all authenticated access` that allows any authenticated utilisateur through
+`auth.uid() IS NOT NULL`. Review whether that temporary policy est still intended.
+
+### H4 — Autorisation est duplicated across four layers avec différent rôle sets {#h4}
+
+| | |
+| --- | --- |
+| Dépôts | both |
+| Preuve | `website` grants full access vers admin/director/executive/sales; `Mobile` route guards allow admin/director/sales; `create-user` permits director/admin; `can_user_mark_attendance` permits admin/director. |
+| Confidence | **Vérifié** |
+
+Four hardcoded lists, non partagé definition, already divergent — an `executive`
+peut use all de `website` et est bounced vers le login screen par `Mobile`. Renaming
+ou removing a rôle breaks four places avec non compile-time error.
+
+**Fix:** one partagé definition, et derive le rest. Documented dans full at
+[Rôles et permissions](/docs/website/roles-and-permissions).
+
+### H5 — Utilisateurs have been provisioned par direct SQL, bypassing le Edge Function {#h5}
+
+| | |
+| --- | --- |
+| Dépôt | `Mobile` |
+| Fichier | <SourceRef repo="Mobile" path="Trail/login-hashir-1.md" /> |
+| Preuve | An admin account a été créé *"directly dans le Supabase DB rather than through Supabase's normal signup/admin API"*, causing sign-dans vers fail avec `Database error querying schema`. |
+| Confidence | **Vérifié** |
+
+Two problems. **Process:** bypassing `create-user` skips its `director`/`admin`
+rôle check et its `audit_log` écrit, so `audit_log` est **ne** a complete record
+de utilisateur creation. **Reliability:** le même incident est le root cause de a
+confusing auth failure — see
+[Dépannage A1](/docs/troubleshooting/authentication#a1).
+
+**Fix:** provision utilisateurs only through le Edge Function. Si direct SQL est
+unavoidable, le `auth.identities` row et le empty-string columns sont mandatory.
+
+### H6 — Base de données changes sont applied vers production without version control {#h6}
+
+| | |
+| --- | --- |
+| Dépôt | `website` |
+| Fichier | <SourceRef repo="website" path="Trail/packed-date-report-conflict-log.md" /> |
+| Preuve | A migration named `prefer_instance_packed_at_in_reports` a été applied vers le live project, replacing le `fetch_report_instances` RPC body, then reverted. Neither exists dans any dépôt. `website` has non `supabase/` directory at all. |
+| Confidence | **Vérifié** |
+
+A sécurité finding, ne merely a hygiene one: there est non reviewable history de
+changes vers policies, grants, fonctions ou triggers. A privilege change could be
+made et nobody could later prove what changed ou revert it reliably.
+
+**Fix:** see [Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+## MEDIUM {#medium}
+
+### M1 — Username-vers-email disclosure {#m1}
+
+`get_user_email_by_username` returns an email pour a username et est called
+**avant** authentification. Live verification confirms it est `SECURITY DEFINER`
+et executable par `anon` et `authenticated`. This est an unauthenticated
+username-vers-email enumeration oracle unless rate-limited ou otherwise monitored.
+Mitigation: rate limiting, ou accept le trade-off knowingly.
+
+### M2 — Backend config est committed et logged {#m2}
+
+`Mobile/app.json` commits `extra.supabaseUrl` et `extra.supabasePublishableKey`,
+et <SourceRef repo="Mobile" path="utils/api/supabase.ts" /> prints both vers le
+console on every launch via four `console.warn` calls (le code comments them as
+*"test logs"* vers remove). le key est le publishable/anon key — **public par
+design**, so this est ne a secret leak. le finding est le pattern: it defeats
+rotation et environnement separation, et would be severe si a secret key ont été
+ever placed dans that slot.
+
+### M3 — Ad-hoc production query scripts committed at le dépôt root {#m3}
+
+`website` contient `inspect_schema.js`, `inspect_rpc.js`, `inspect_instances.js`
+et `inspect_clients.js`, each hardcoding le project URL et publishable key et
+querying le live base de données. `Trail/box-snapshots-2026-08-10.json` shows le même
+habit pour data — a hand-rolled JSON backup taken avant a production "redo".
+Unlabelled production tooling invites accidental use against live data.
+
+### M4 — Dead code that lit as a sécurité control {#m4}
+
+<SourceRef repo="website" path="src/middleware/auth.ts" symbol="requireAdmin" />
+performs **non** rôle check et returns le utilisateur, avec le comment *"This est a
+placeholder - implement actual rôle checking"*. Neither it nor `requireAuth` est
+imported anywhere. A future developer could reasonably believe calling
+`requireAdmin()` protects a route. Delete it ou implement it.
+
+### M5 — Permissive CORS on le privileged Edge Function {#m5}
+
+`create-user` sets `Access-Control-Allow-Origin: '*'`. Mitigated par requiring a
+bearer token et checking le rôle, so this est ne exploitable on its own, but a
+service-role endpoint devrait ne accept requests depuis any origin.
+
+### M6 — Unused SMS-OTP authentification chemin {#m6}
+
+`signInWithPhone` et `verifyOtp` sont implemented et exposed through
+`AuthContext`, but **non screen calls them**. Si phone auth est enabled dans le
+Supabase project, that est an unmonitored second entry point. Either remove le
+code ou document et monitor it.
+[OQ-017](/docs/reference/open-questions#oq-017).
+
+### M7 — Service-role key resolved depuis multiple fallback names {#m7}
+
+`create-user` tries `SUPABASE_SERVICE_ROLE_KEY`, then `SERVICE_ROLE_KEY`, then
+`AUTH_SECRET_KEY`. le webhook tries `SUPABASE_SECRET_KEY` then
+`SUPABASE_SERVICE_ROLE_KEY`. Ambiguity about which name est authoritative invites
+misconfiguration, et makes it hard vers prove a key has been fully rotated.
+
+### M8 — Null dereference on a privileged chemin {#m8}
+
+`create-user` lit `profile.roles.name` without a null check. A profile whose
+rôle join returns null produces an unhandled 500 rather than a clean 403.
+
+## LOW {#low}
+
+- **Verbose logging ships vers production.** `Mobile` contient 120 `console.error`,
+  70 `console.log` et 21 `console.warn` calls, et `eas.json` applies non
+  stripping. Operational data may land dans device logs.
+- **Non error boundary** dans either application. `Mobile` surfaces failures through
+  183 `Alert.alert` sites avec inconsistent wording.
+- **`debug_user_info`** exists as a base de données fonction; `components/debug/NetworkTest.tsx`
+  lit environnement variables directly.
+- **Tests do ne gate déploiement.** `website`'s production workflow runs tests
+  avec `continue-on-error: true`, et only two test fichiers exist. `Mobile` has non
+  tests et non test script.
+
+## What est good, et devrait ne be lost {#what-is-good-and-should-not-be-lost}
+
+Worth recording so a refactor does ne remove it:
+
+- le Resend inbound webhook **verifies svix signatures** avant trusting a
+  payload.
+- `create-user` **rolls back le auth utilisateur** si le profile insert fails, et
+  **écrit vers `audit_log`**.
+- le two applications use **distinct session Storage keys**, so sessions cannot
+  collide.
+- `website` utilise **PKCE** et clears corrupted sessions on load.
+- `audit_log` supports an **`is_critical_alert`** flag, so a severity concept
+  already exists.
+- <SourceRef repo="website" path="AGENTS.md" /> already contient a **Base de données
+  Safety** policy et a six-step **Base de données Change Process**. It est real
+  governance et devrait be adopted rather than rewritten.
+
+## Verification queue {#verification-queue}
+
+Remaining queue:
+
+1. est phone auth enabled dans le project? (M6)
+2. est `audit_log` complete pour utilisateur creation? (H5)
+3. sont all `SECURITY DEFINER` grants vers `anon` intentional?
+4. Devrait le temporary broad `packer_sessions` policy be removed?
+

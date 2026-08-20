@@ -1,0 +1,242 @@
+---
+title: "Findings الأمان"
+sidebar_label: "Findings"
+description: "Findings أمان تم التحقق منها ومخاطر نشطة."
+---
+
+# الأمان findings {#security-findings}
+
+Findings من a المصدر audit on 2026-08-19, حدث مع read-only live Supabase
+catalog verification on 2026-08-20. No penetration testing أو runtime analysis
+تم performed.
+
+<Status
+  type="partial"
+  date="2026-08-20"
+  sources={[
+    'website:src/routes/',
+    'website:src/middleware/auth.ts',
+    'website:inspect_rpc.js',
+    'Mobile:utils/api/supabase.ts',
+    'Mobile:app.json',
+    'Mobile:supabase/functions/create-user/index.ts',
+    'Mobile:Trail/login-hashir-1.md',
+    'website:Trail/packed-date-report-conflict-log.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  Every finding cites a ملف that تم قراءة directly. Supabase-dependent findings
+  تم حدث بعد read-only live catalog verification on 2026-08-20.
+  **No secret values appear on this page أو anywhere on this site.**
+</Status>
+
+:::info لا توجد findings من مستوى CRITICAL — مع one caveat
+
+Nothing في المصدر rises إلى CRITICAL on its own. Two HIGH findings (H2, H3) would
+become CRITICAL إذا live verification goes ال wrong way. They هي ال two things
+إلى check first.
+
+:::
+
+## HIGH {#high}
+
+### H1 — `/inventory` has no route guard {#h1}
+
+| | |
+| --- | --- |
+| المستودع | `website` |
+| ملف | <SourceRef repo="website" path="src/routes/inventory.tsx" /> |
+| الدليل | ال route هو listed في `ADMIN_PAGES` في `src/lib/access.ts` but does لا call `useRequirePageAccess`. All 13 sibling protected pages do. |
+| Confidence | **تم التحقق** as a route-guard gap. Data exposure depends on live RLS. |
+
+A signed-في `client`- أو `packer`-role مستخدم navigating directly إلى `/inventory`
+renders ال full 2,765-line inventory module, including supplier و pricing
+views. What they يمكن actually *see* هو decided بواسطة live RLS on `materials`,
+`material_variants`, `suppliers` و `supplier_pricing`.
+
+**Fix:** add `useRequirePageAccess()` إلى ال route. One line, و it makes ال
+page consistent مع every sibling. It does لا remove ال need لـ RLS.
+
+### H2 — Mobile package photos هي uploaded إلى a bucket مع public URLs {#h2}
+
+| | |
+| --- | --- |
+| المستودع | `Mobile` |
+| ملف | <SourceRef repo="Mobile" path="utils/api/supabase.ts" symbol="order media upload" /> |
+| الدليل | `storage.from('order_media').upload(...)` immediately followed بواسطة `storage.from('order_media').getPublicUrl(filename)`. Filenames هي `orderPackageId/timestamp.ext`. |
+| Confidence | **تم التحقق** as a code/live-storage mismatch. |
+
+`getPublicUrl` only returns a working URL لـ a public bucket. Live verification
+on 2026-08-20 found **no `order_media` bucket**. ال likely failure mode هو
+broken Mobile photo upload/retrieval rather than public exposure through that
+bucket. `website` يستخدم a مختلف live bucket, `media`, which هو public.
+
+**Fix:** align Mobile مع ال live Storage model, أو create a deliberately
+private replacement bucket مع signed URLs. Creating/changing buckets هو a
+الإنتاج change و requires explicit approval.
+
+### H3 — A written RLS policy هو predicated on a non-existent column {#h3}
+
+| | |
+| --- | --- |
+| المستودع | `Mobile` |
+| ملف | <SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" /> |
+| الدليل | ال `packer_sessions` manage policy requires `orders.status IN ('pending','in_progress')`. `orders` has `production_status` و `commercial_status`, no `status`. No التطبيق code يقرأ `orders.status`. |
+| Confidence | **تم التحقق** as المصدر/live drift. |
+
+Live verification on 2026-08-20 shows ال الإنتاج policy differs من ال
+ملف: it يستخدم `orders.production_status IN ('pending','in_progress')`. ال
+non-existent-column bug هو لا live today.
+
+ال remaining الخطر هو مختلف: `packer_sessions` also has a policy named
+`Temporary all authenticated access` that allows any authenticated مستخدم through
+`auth.uid() IS NOT NULL`. Review whether that temporary policy هو still intended.
+
+### H4 — التفويض هو duplicated across four layers مع مختلف role sets {#h4}
+
+| | |
+| --- | --- |
+| المستودعات | both |
+| الدليل | `website` grants full access إلى admin/director/executive/sales; `Mobile` route guards allow admin/director/sales; `create-user` permits director/admin; `can_user_mark_attendance` permits admin/director. |
+| Confidence | **تم التحقق** |
+
+Four hardcoded lists, no مشترك definition, already divergent — an `executive`
+يمكن use all من `website` و هو bounced إلى ال login screen بواسطة `Mobile`. Renaming
+أو removing a role breaks four places مع no compile-time error.
+
+**Fix:** one مشترك definition, و derive ال rest. Documented في full at
+[Roles و permissions](/docs/website/roles-and-permissions).
+
+### H5 — مستخدمون have been provisioned بواسطة مباشر SQL, bypassing ال Edge Function {#h5}
+
+| | |
+| --- | --- |
+| المستودع | `Mobile` |
+| ملف | <SourceRef repo="Mobile" path="Trail/login-hashir-1.md" /> |
+| الدليل | An admin account تم أنشئ *"directly في ال Supabase DB rather than through Supabase's normal signup/admin API"*, causing sign-في إلى fail مع `Database error querying schema`. |
+| Confidence | **تم التحقق** |
+
+Two problems. **Process:** bypassing `create-user` skips its `director`/`admin`
+role check و its `audit_log` كتابة, so `audit_log` هو **لا** a complete record
+من مستخدم creation. **Reliability:** ال نفس incident هو ال root cause من a
+confusing auth failure — see
+[استكشاف الأخطاء A1](/docs/troubleshooting/authentication#a1).
+
+**Fix:** provision مستخدمون only through ال Edge Function. إذا مباشر SQL هو
+unavoidable, ال `auth.identities` row و ال empty-string columns هي mandatory.
+
+### H6 — قاعدة البيانات changes هي applied إلى الإنتاج without version control {#h6}
+
+| | |
+| --- | --- |
+| المستودع | `website` |
+| ملف | <SourceRef repo="website" path="Trail/packed-date-report-conflict-log.md" /> |
+| الدليل | A migration named `prefer_instance_packed_at_in_reports` تم applied إلى ال live project, replacing ال `fetch_report_instances` RPC body, then reverted. Neither exists في any المستودع. `website` has no `supabase/` directory at all. |
+| Confidence | **تم التحقق** |
+
+A الأمان finding, لا merely a hygiene one: there هو no reviewable history من
+changes إلى policies, grants, functions أو triggers. A privilege change could be
+made و nobody could later prove what changed أو revert it reliably.
+
+**Fix:** see [Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+## MEDIUM {#medium}
+
+### M1 — Username-إلى-email disclosure {#m1}
+
+`get_user_email_by_username` returns an email لـ a username و هو called
+**قبل** المصادقة. Live verification confirms it هو `SECURITY DEFINER`
+و executable بواسطة `anon` و `authenticated`. This هو an unauthenticated
+username-إلى-email enumeration oracle unless rate-limited أو otherwise monitored.
+Mitigation: rate limiting, أو accept ال trade-off knowingly.
+
+### M2 — Backend config هو committed و logged {#m2}
+
+`Mobile/app.json` commits `extra.supabaseUrl` و `extra.supabasePublishableKey`,
+و <SourceRef repo="Mobile" path="utils/api/supabase.ts" /> prints both إلى ال
+console on every launch via four `console.warn` calls (ال code comments them as
+*"test logs"* إلى remove). ال key هو ال publishable/anon key — **public بواسطة
+design**, so this هو لا a secret leak. ال finding هو ال pattern: it defeats
+rotation و البيئة separation, و would be severe إذا a secret key تم
+ever placed في that slot.
+
+### M3 — Ad-hoc الإنتاج query scripts committed at ال المستودع root {#m3}
+
+`website` يحتوي `inspect_schema.js`, `inspect_rpc.js`, `inspect_instances.js`
+و `inspect_clients.js`, each hardcoding ال project URL و publishable key و
+querying ال live قاعدة البيانات. `Trail/box-snapshots-2026-08-10.json` shows ال نفس
+habit لـ data — a hand-rolled JSON backup taken قبل a الإنتاج "redo".
+Unlabelled الإنتاج tooling invites accidental use against live data.
+
+### M4 — Dead code that يقرأ as a الأمان control {#m4}
+
+<SourceRef repo="website" path="src/middleware/auth.ts" symbol="requireAdmin" />
+performs **no** role check و returns ال مستخدم, مع ال comment *"This هو a
+placeholder - implement actual role checking"*. Neither it nor `requireAuth` هو
+imported anywhere. A future developer could reasonably believe calling
+`requireAdmin()` protects a route. Delete it أو implement it.
+
+### M5 — Permissive CORS on ال privileged Edge Function {#m5}
+
+`create-user` sets `Access-Control-Allow-Origin: '*'`. Mitigated بواسطة requiring a
+bearer token و checking ال role, so this هو لا exploitable on its own, but a
+service-role endpoint ينبغي لا accept requests من any origin.
+
+### M6 — Unused SMS-OTP المصادقة مسار {#m6}
+
+`signInWithPhone` و `verifyOtp` هي implemented و exposed through
+`AuthContext`, but **no screen calls them**. إذا phone auth هو enabled في ال
+Supabase project, that هو an unmonitored second entry point. Either remove ال
+code أو document و monitor it.
+[OQ-017](/docs/reference/open-questions#oq-017).
+
+### M7 — Service-role key resolved من multiple fallback names {#m7}
+
+`create-user` tries `SUPABASE_SERVICE_ROLE_KEY`, then `SERVICE_ROLE_KEY`, then
+`AUTH_SECRET_KEY`. ال webhook tries `SUPABASE_SECRET_KEY` then
+`SUPABASE_SERVICE_ROLE_KEY`. Ambiguity about which name هو authoritative invites
+misconfiguration, و makes it hard إلى prove a key has been fully rotated.
+
+### M8 — Null dereference on a privileged مسار {#m8}
+
+`create-user` يقرأ `profile.roles.name` without a null check. A profile whose
+role join returns null produces an unhandled 500 rather than a clean 403.
+
+## LOW {#low}
+
+- **Verbose logging ships إلى الإنتاج.** `Mobile` يحتوي 120 `console.error`,
+  70 `console.log` و 21 `console.warn` calls, و `eas.json` applies no
+  stripping. Operational data may land في device logs.
+- **No error boundary** في either التطبيق. `Mobile` surfaces failures through
+  183 `Alert.alert` sites مع inconsistent wording.
+- **`debug_user_info`** exists as a قاعدة البيانات function; `components/debug/NetworkTest.tsx`
+  يقرأ البيئة variables directly.
+- **Tests do لا gate النشر.** `website`'s الإنتاج workflow runs tests
+  مع `continue-on-error: true`, و only two test ملفات exist. `Mobile` has no
+  tests و no test script.
+
+## What هو good, و ينبغي لا be lost {#what-is-good-and-should-not-be-lost}
+
+Worth recording so a refactor does لا remove it:
+
+- ال Resend inbound webhook **verifies svix signatures** قبل trusting a
+  payload.
+- `create-user` **rolls back ال auth مستخدم** إذا ال profile insert fails, و
+  **يكتب إلى `audit_log`**.
+- ال two التطبيقات use **distinct session Storage keys**, so sessions cannot
+  collide.
+- `website` يستخدم **PKCE** و clears corrupted sessions on load.
+- `audit_log` supports an **`is_critical_alert`** flag, so a severity concept
+  already exists.
+- <SourceRef repo="website" path="AGENTS.md" /> already يحتوي a **قاعدة البيانات
+  Safety** policy و a six-step **قاعدة البيانات Change Process**. It هو real
+  governance و ينبغي be adopted rather than rewritten.
+
+## Verification queue {#verification-queue}
+
+Remaining queue:
+
+1. هو phone auth enabled في ال project? (M6)
+2. هو `audit_log` complete لـ مستخدم creation? (H5)
+3. هي all `SECURITY DEFINER` grants إلى `anon` intentional?
+4. ينبغي ال temporary broad `packer_sessions` policy be removed?
+

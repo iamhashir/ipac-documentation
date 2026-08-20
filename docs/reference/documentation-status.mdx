@@ -129,6 +129,12 @@ Two deliberate properties of this design:
   prevents it. The registry holds one `ref` per repository; replacing a branch
   name with a commit SHA there upgrades every reference on the site at once,
   with no page edits.
+- **Source drift is surfaced, not treated as automatic failure.**
+  `docusaurus.config.ts` carries `sourceVerification` metadata with the reviewed
+  commit and latest observed GitHub commit for each application repository.
+  When those differ, `SourceRef` shows "source changed since verification" next
+  to that repository's references. That means the linked source should be
+  re-reviewed; it does not by itself prove the documentation claim is wrong.
 - **A repository with no confirmed URL renders as plain text**, marked as
   unconfirmed, rather than linking to an invented address. Both application
   repositories are now confirmed under the `ipacapps` organisation, so both

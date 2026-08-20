@@ -1,0 +1,125 @@
+---
+title: "سجلات القرارات المعمارية"
+sidebar_label: "ADR"
+description: "فهرس قرارات الهندسة في IPAC."
+---
+
+# Architectural decisions {#architectural-decisions}
+
+An **ADR** — الهندسة Decision Record — هو a short document recording a
+decision that shaped ال system: what تم decided, why, و what it cost.
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={['ipac-documentation:docs/adr/']}>
+  This page documents a convention adopted في this المستودع, so it هو
+  self-verifying. ال individual ADRs each carry their own الدليل confidence.
+</Status>
+
+## Why IPAC keeps them {#why-ipac-keeps-them}
+
+IPAC's knowledge concentrated في very few people: one التطبيق هو 91% ال work
+من a single author, ال other 70%. Code shows *what* ال system does. It almost never
+shows **why a choice تم made, أو what تم rejected** — و that هو exactly what a
+new developer needs في order إلى change something safely rather than reverse a
+deliberate decision بواسطة accident.
+
+Three decisions في this system هي already at الخطر من being lost, و they هي ال
+three recorded here.
+
+:::danger An ADR هو لا permission إلى reconstruct history
+
+These ADRs تم written **بعد ال fact**, من المستودع الدليل. No formal ADR
+process existed at ال time any من these decisions تم made.
+
+ال rule that follows من that:
+
+- إذا ال المستودع proves **what changed, عندما, و why** → record all three.
+- إذا it proves only **what changed** → record only that, و كتابة
+  **"لا recorded"** لـ ال rest.
+
+Never infer a motive من an outcome. A plausible rationale presented as fact هو
+worse than an admitted gap, لأن ال next developer cannot tell ال difference.
+
+:::
+
+## ال records {#the-records}
+
+| ADR | Subject | الحالة | الدليل confidence |
+| --- | --- | --- | --- |
+| [ADR-0001](./adr-0001-website-framework) | Web التطبيق framework: Expo Web → TanStack Start | Accepted | High — motivation stated في ال المستودع |
+| [ADR-0002](./adr-0002-repository-migration) | المستودع و organisation migration | Accepted | High لـ *what*, none لـ *why* |
+| [ADR-0003](./adr-0003-report-packed-date) | تقرير packed-date semantics | **Accepted** | تم التحقق live 2026-08-20 |
+
+## Lifecycle states {#lifecycle-states}
+
+IPAC يستخدم six. ال last two exist لأن retrofitted records cannot always claim
+more.
+
+| الحالة | Meaning |
+| --- | --- |
+| **Proposed** | Written و under discussion. لا في effect. |
+| **Accepted** | Decided و في effect. ال الحالي intended design. |
+| **Superseded** | Replaced بواسطة a later ADR, which يجب be named. Kept, never deleted. |
+| **Deprecated** | No longer intended, مع no مباشر replacement. |
+| **Historical** | Records something that demonstrably happened, reconstructed بعد ال fact. It documents ال past; it does لا assert ال present. |
+| **Unresolved** | ال decision تم made و applied, but **ال الحالي state cannot be تم التحقق**. يجب link ال مفتوح سؤال that would settle it. |
+
+`Historical / Current state unresolved` هو a legitimate combination, و
+[ADR-0003](./adr-0003-report-packed-date) يستخدم it: what تم done هو provable, what هو
+live today هو لا.
+
+## عندما a new ADR هو required {#when-a-new-adr-is-required}
+
+كتابة one عندما ال change affects:
+
+- **التطبيق الهندسة** — framework, rendering model, routing strategy
+- **مشترك backend contracts** — a table, RPC signature أو enum that both
+  التطبيقات depend on
+- **ال المصادقة أو التفويض model** — including anything touching ال
+  four enforcement layers
+- **RLS strategy** — how policies هي structured, لا an individual policy
+- **major framework changes** — a dependency ال الهندسة rests on
+- **النشر الهندسة** — hosting, pipeline, أو release mechanism
+- **cross-application data contracts** — anything في ال 26 مشترك tables
+- **migration strategy** — schema versioning, المستودع moves, data backfills
+
+ال test: *would a competent developer six months من now reverse this بواسطة accident
+لأن ال reason هو invisible?* إذا yes, كتابة ال ADR.
+
+## عندما an ADR هو لا required {#when-an-adr-is-not-required}
+
+Do لا كتابة one لـ routine implementation decisions:
+
+- choosing a component structure inside one feature
+- naming, formatting, refactoring
+- adding a field إلى an الموجود screen
+- fixing a bug without changing a contract
+- dependency patch و minor upgrades
+
+لـ those, ال code, ال commit message و — where relevant — a `Trail/` entry في
+ال التطبيق المستودع هي enough. See
+[step 11 من Your first change](/docs/guides/getting-started/first-change#step-11) لـ
+ال documentation rule that governs ال everyday case.
+
+## Writing one {#writing-one}
+
+Copy ال section structure من any الموجود ADR. Every one carries a header block:
+
+```text
+Status:              one of the six above
+Date:                when the decision took effect, or "Not recorded"
+Decision owners:     who decided, or "Not recorded"
+Evidence confidence: what the repository actually proves
+```
+
+Then: Context · Problem · Decision · Alternatives · Consequences (positive,
+negative, المخاطر) · الحالي State · الدليل · Related Documentation · مفتوح
+أسئلة.
+
+**Alternatives هو ال section most often faked.** إذا no alternative تم evaluated at
+ال time — أو إذا ال evaluation تم لا written down — ال honest entry هو
+**"لا recorded."** Listing alternatives you thought من while writing ال ADR
+misrepresents ال decision as more considered than it تم.
+

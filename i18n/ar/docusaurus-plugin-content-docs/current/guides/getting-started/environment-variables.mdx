@@ -1,0 +1,126 @@
+---
+title: "متغيرات البيئة"
+sidebar_label: "متغيرات البيئة"
+description: "المتغيرات والأسرار المطلوبة لتشغيل IPAC محليا."
+---
+
+# البيئة variables {#environment-variables}
+
+**Names only.** This page lists which variables exist و what they هي لـ. It
+يحتوي no values, و no page on this site ever سوف.
+
+<Status
+  type="partial"
+  date="2026-08-19"
+  sources={[
+    'website:.env.example',
+    'website:CLAUDE.md',
+    'website:.github/workflows/ci-cd.yml',
+    'Mobile:.env.example',
+    'website:docs/DEVELOPMENT.md',
+  ]}>
+  Client variable names تم قراءة من each المستودع `.env.example` و CI
+  workflow. ال server-only names هي reproduced من
+  `website/docs/DEVELOPMENT.md` و تم لا independently confirmed against
+  running server code.
+</Status>
+
+## Rules {#rules}
+
+1. **Never commit a real value.** لا إلى a المستودع, لا إلى this site.
+2. **Never put a secret أو service-role key في a client-visible variable.**
+   Anything prefixed `VITE_` أو `EXPO_PUBLIC_` هو shipped إلى ال browser أو ال
+   device و يجب be treated as public.
+3. **Never paste a key into documentation, a log, a ticket, أو an assistant
+   prompt.** Pasting into a prompt هو disclosure.
+4. **Get values من a person أو a secret store**, و keep them في your محلي
+   `.env`, which هو git-ignored.
+
+## website {#website}
+
+Client-side, من `.env.example`:
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `VITE_ENABLE_TANSTACK_DEVTOOLS` | Optional. Enables TanStack devtools |
+
+Additional variables appear في ال النشر workflow و هي injected at build
+time as release metadata rather than الإعداد:
+
+`VITE_APP_VERSION`, `VITE_RELEASE_TYPE`, `VITE_RELEASE_FEATURES`, و ال
+Vercel-provided `VERCEL_GIT_COMMIT_SHA`, `VERCEL_GIT_COMMIT_MESSAGE`,
+`VERCEL_GIT_COMMIT_DATE`.
+
+النشر also requires `VERCEL_TOKEN`, `VERCEL_ORG_ID` و
+`VERCEL_PROJECT_ID` as GitHub Actions secrets.
+
+## Mobile {#mobile}
+
+من `.env.example`:
+
+| Variable | Purpose |
+| --- | --- |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `EXPO_PUBLIC_APP_NAME` | التطبيق display name |
+| `EXPO_PUBLIC_APP_VERSION` | التطبيق version string |
+
+:::danger `app.json` wins — `.env` does لا work لـ Mobile
+
+`Mobile/utils/api/supabase.ts` resolves الإعداد في this order:
+
+```text
+1. Constants.expoConfig.extra.supabaseUrl        ← app.json, COMMITTED
+2. process.env.EXPO_PUBLIC_SUPABASE_URL          ← .env, fallback only
+```
+
+لأن `app.json` ships real values في `extra.supabaseUrl` و
+`extra.supabasePublishableKey`, **ال fallback هو never reached**. Setting
+`EXPO_PUBLIC_SUPABASE_URL` في `.env` has no effect, و there هو currently no way
+إلى build `Mobile` against a مختلف backend without editing `app.json`.
+
+ال نفس ملف also prints both values إلى ال console on every launch. See
+[M2](/docs/security/findings#m2).
+
+:::
+
+## Server-only {#server-only}
+
+These يجب never reach a client bundle. تم التحقق بواسطة reading
+`website/server/api/webhooks/resend/inbound.post.ts` و
+`Mobile/supabase/functions/create-user/index.ts` directly:
+
+| Variable | مستخدم بواسطة | Purpose |
+| --- | --- | --- |
+| `SUPABASE_URL` | webhook, Edge Function | Project URL, server context |
+| `SUPABASE_SECRET_KEY` | webhook (**preferred**) | Secret key لـ privileged access |
+| `SUPABASE_SERVICE_ROLE_KEY` | webhook (fallback), Edge Function | Service-role key — full قاعدة البيانات access, **bypasses row level الأمان** |
+| `RESEND_INBOUND_WEBHOOK_SECRET` | webhook | Verifies inbound supplier email via svix signatures |
+| `RESEND_API_KEY` | website server | Outbound supplier email |
+| `RESEND_FROM_EMAIL`, `RESEND_CC_EMAIL`, `RESEND_REPLY_TO_EMAIL` | website server | Supplier email addressing |
+
+A service-role key bypasses row level الأمان entirely. It belongs only في
+server-side أو Edge Function contexts. ال one Edge Function performs privileged
+مستخدم creation using it.
+
+:::warning Multiple fallback names لـ ال نفس secret
+
+ال Edge Function resolves its key من `SUPABASE_SERVICE_ROLE_KEY`, then
+`SERVICE_ROLE_KEY`, then `AUTH_SECRET_KEY`. ال webhook tries `SUPABASE_SECRET_KEY`
+then `SUPABASE_SERVICE_ROLE_KEY`.
+
+Two consequences: it هو ambiguous which name هو authoritative, و **you cannot
+prove a key has been fully rotated** without checking every name في every
+البيئة. Recorded as [M7](/docs/security/findings#m7).
+
+:::
+
+## This documentation site {#this-documentation-site}
+
+ال documentation site requires **no البيئة variables at all**. It هو a
+static build مع no backend و no secrets. That هو deliberate: it يعني ال
+site يمكن be built بواسطة anyone who يمكن clone ال المستودع, و there هو nothing
+في its النشر pipeline إلى leak.
+

@@ -37,7 +37,162 @@ const REPOSITORIES = {
   },
 } as const;
 
+const SOURCE_VERIFICATION = {
+  website: {
+    reviewedRef: '04fcc9354b30acfb1538acb3708aa90d62be0ce4',
+    latestRef: 'd4857d00e5dea34fd1dea646f297261738651c40',
+    checkedAt: '2026-08-20',
+  },
+  Mobile: {
+    reviewedRef: '2de95be836a0f2b5066c52ac6470e41296352517',
+    latestRef: '2de95be836a0f2b5066c52ac6470e41296352517',
+    checkedAt: '2026-08-20',
+  },
+} as const;
+
 const DOCS_REPO = REPOSITORIES['ipac-documentation'].url;
+const IS_DEV_SERVER = process.env.IPAC_DOCS_DEV_SERVER === '1';
+const CURRENT_LOCALE = process.env.DOCUSAURUS_CURRENT_LOCALE ?? 'en';
+
+const UI = {
+  en: {
+    nav: {
+      docs: 'Docs',
+      architecture: 'Architecture',
+      operations: 'Operations',
+      reference: 'Reference',
+      gettingStarted: 'Getting Started',
+      mobile: 'Mobile',
+      website: 'Website',
+      workflows: 'Workflows',
+      systemOverview: 'System Overview',
+      crossApp: 'Cross-App',
+      sharedBackend: 'Shared Backend',
+      database: 'Database',
+      security: 'Security',
+      troubleshooting: 'Troubleshooting',
+      buildRelease: 'Build & Release',
+      websiteDeployment: 'Website Deployment',
+      liveVerification: 'Live Verification',
+      documentationStatus: 'Documentation Status',
+      openQuestions: 'Open Questions',
+      adrs: 'ADRs',
+      schemaProvenance: 'Schema Provenance',
+      github: 'GitHub',
+    },
+    footer: {
+      startHere: 'Start here',
+      introduction: 'Introduction',
+      gettingStarted: 'Getting started',
+      systemArchitecture: 'System architecture',
+      reference: 'Reference',
+      openQuestions: 'Open questions',
+      documentationStatus: 'Documentation status',
+      architecturalDecisions: 'Architectural decisions',
+      repositories: 'Repositories',
+      copyright: 'Internal documentation - not for public distribution.',
+    },
+    devSearch: 'Search is available in production builds.',
+  },
+  fr: {
+    nav: {
+      docs: 'Docs',
+      architecture: 'Architecture',
+      operations: 'Operations',
+      reference: 'Référence',
+      gettingStarted: 'Bien démarrer',
+      mobile: 'Mobile',
+      website: 'Website',
+      workflows: 'Flux de travail',
+      systemOverview: 'Vue système',
+      crossApp: 'Inter-applications',
+      sharedBackend: 'Backend partagé',
+      database: 'Base de données',
+      security: 'Sécurité',
+      troubleshooting: 'Dépannage',
+      buildRelease: 'Build & release',
+      websiteDeployment: 'Déploiement website',
+      liveVerification: 'Vérification live',
+      documentationStatus: 'État de la documentation',
+      openQuestions: 'Questions ouvertes',
+      adrs: 'ADR',
+      schemaProvenance: 'Provenance du schéma',
+      github: 'GitHub',
+    },
+    footer: {
+      startHere: 'Commencer',
+      introduction: 'Introduction',
+      gettingStarted: 'Bien démarrer',
+      systemArchitecture: 'Architecture système',
+      reference: 'Référence',
+      openQuestions: 'Questions ouvertes',
+      documentationStatus: 'État de la documentation',
+      architecturalDecisions: 'Décisions architecturales',
+      repositories: 'Dépôts',
+      copyright: 'Documentation interne - diffusion publique interdite.',
+    },
+    devSearch: 'La recherche est disponible dans les builds de production.',
+  },
+  ar: {
+    nav: {
+      docs: 'المستندات',
+      architecture: 'الهندسة',
+      operations: 'التشغيل',
+      reference: 'المرجع',
+      gettingStarted: 'البدء',
+      mobile: 'Mobile',
+      website: 'Website',
+      workflows: 'سير العمل',
+      systemOverview: 'نظرة على النظام',
+      crossApp: 'بين التطبيقات',
+      sharedBackend: 'Backend مشترك',
+      database: 'قاعدة البيانات',
+      security: 'الأمان',
+      troubleshooting: 'استكشاف الأخطاء',
+      buildRelease: 'Build & release',
+      websiteDeployment: 'نشر website',
+      liveVerification: 'تحقق live',
+      documentationStatus: 'حالة التوثيق',
+      openQuestions: 'أسئلة مفتوحة',
+      adrs: 'ADR',
+      schemaProvenance: 'مصدر المخطط',
+      github: 'GitHub',
+    },
+    footer: {
+      startHere: 'ابدأ هنا',
+      introduction: 'مقدمة',
+      gettingStarted: 'البدء',
+      systemArchitecture: 'هندسة النظام',
+      reference: 'المرجع',
+      openQuestions: 'أسئلة مفتوحة',
+      documentationStatus: 'حالة التوثيق',
+      architecturalDecisions: 'قرارات الهندسة',
+      repositories: 'المستودعات',
+      copyright: 'توثيق داخلي - غير مخصص للنشر العام.',
+    },
+    devSearch: 'البحث متاح في builds الإنتاج.',
+  },
+} as const;
+
+const t = UI[CURRENT_LOCALE as keyof typeof UI] ?? UI.en;
+
+const LOCAL_SEARCH_PLUGIN: NonNullable<Config['plugins']>[number] = [
+  '@easyops-cn/docusaurus-search-local',
+  {
+    hashed: true,
+    indexDocs: true,
+    indexPages: true,
+    indexBlog: false,
+    docsRouteBasePath: '/docs',
+    searchResultLimits: 20,
+    searchResultContextMaxLength: 80,
+    explicitSearchResultPath: true,
+    searchBarShortcut: false,
+    searchBarShortcutHint: false,
+    searchBarPosition: 'right',
+    language: ['en', 'fr', 'ar'],
+  },
+];
 
 const config: Config = {
   title: 'IPAC Documentation',
@@ -59,7 +214,24 @@ const config: Config = {
 
   i18n: {
     defaultLocale: 'en',
-    locales: ['en'],
+    locales: ['en', 'fr', 'ar'],
+    localeConfigs: {
+      en: {
+        label: 'English',
+        htmlLang: 'en',
+        path: 'en',
+        baseUrl: '/en/',
+      },
+      fr: {
+        label: 'Français',
+        htmlLang: 'fr',
+      },
+      ar: {
+        label: 'العربية',
+        htmlLang: 'ar',
+        direction: 'rtl',
+      },
+    },
   },
 
   markdown: {
@@ -70,27 +242,11 @@ const config: Config = {
     },
   },
   themes: ['@docusaurus/theme-mermaid'],
-  plugins: [
-    [
-      '@easyops-cn/docusaurus-search-local',
-      {
-        hashed: true,
-        indexDocs: true,
-        indexPages: true,
-        indexBlog: false,
-        docsRouteBasePath: '/docs',
-        searchResultLimits: 20,
-        searchResultContextMaxLength: 80,
-        explicitSearchResultPath: true,
-        searchBarShortcut: true,
-        searchBarShortcutHint: true,
-        searchBarPosition: 'right',
-      },
-    ],
-  ],
+  plugins: IS_DEV_SERVER ? [] : [LOCAL_SEARCH_PLUGIN],
 
   customFields: {
     repositories: REPOSITORIES,
+    sourceVerification: SOURCE_VERIFICATION,
   },
 
   presets: [
@@ -147,54 +303,67 @@ const config: Config = {
         {
           type: 'dropdown',
           position: 'left',
-          label: 'Docs',
+          label: t.nav.docs,
           items: [
-            { to: '/docs/guides/getting-started/overview', label: 'Getting Started' },
-            { to: '/docs/mobile/build-and-release', label: 'Mobile' },
-            { to: '/docs/guides/architecture/website-architecture', label: 'Website' },
-            { to: '/docs/workflows/overview', label: 'Workflows' },
+            { to: '/docs/guides/getting-started/overview', label: t.nav.gettingStarted },
+            { to: '/docs/mobile/build-and-release', label: t.nav.mobile },
+            { to: '/docs/guides/architecture/website-architecture', label: t.nav.website },
+            { to: '/docs/workflows/overview', label: t.nav.workflows },
           ],
         },
         {
           type: 'dropdown',
           position: 'left',
-          label: 'Architecture',
+          label: t.nav.architecture,
           items: [
-            { to: '/docs/guides/architecture/system-overview', label: 'System Overview' },
-            { to: '/docs/guides/architecture/cross-app', label: 'Cross-App' },
-            { to: '/docs/guides/architecture/shared-backend-model', label: 'Shared Backend' },
-            { to: '/docs/backend/database-model', label: 'Database' },
-            { to: '/docs/security/model', label: 'Security' },
+            { to: '/docs/guides/architecture/system-overview', label: t.nav.systemOverview },
+            { to: '/docs/guides/architecture/cross-app', label: t.nav.crossApp },
+            { to: '/docs/guides/architecture/shared-backend-model', label: t.nav.sharedBackend },
+            { to: '/docs/backend/database-model', label: t.nav.database },
+            { to: '/docs/security/model', label: t.nav.security },
           ],
         },
         {
           type: 'dropdown',
           position: 'left',
-          label: 'Operations',
+          label: t.nav.operations,
           items: [
-            { to: '/docs/troubleshooting/overview', label: 'Troubleshooting' },
-            { to: '/docs/mobile/build-and-release', label: 'Build & Release' },
-            { to: '/docs/troubleshooting/website', label: 'Website Deployment' },
-            { to: '/docs/backend/live-verification', label: 'Live Verification' },
+            { to: '/docs/troubleshooting/overview', label: t.nav.troubleshooting },
+            { to: '/docs/mobile/build-and-release', label: t.nav.buildRelease },
+            { to: '/docs/troubleshooting/website', label: t.nav.websiteDeployment },
+            { to: '/docs/backend/live-verification', label: t.nav.liveVerification },
           ],
         },
         {
           type: 'dropdown',
           position: 'left',
-          label: 'Reference',
+          label: t.nav.reference,
           items: [
-            { to: '/docs/reference/documentation-status', label: 'Documentation Status' },
-            { to: '/docs/reference/open-questions', label: 'Open Questions' },
-            { to: '/docs/adr/overview', label: 'ADRs' },
-            { to: '/docs/backend/schema-provenance', label: 'Schema Provenance' },
+            { to: '/docs/reference/documentation-status', label: t.nav.documentationStatus },
+            { to: '/docs/reference/open-questions', label: t.nav.openQuestions },
+            { to: '/docs/adr/overview', label: t.nav.adrs },
+            { to: '/docs/backend/schema-provenance', label: t.nav.schemaProvenance },
           ],
+        },
+        ...(IS_DEV_SERVER
+          ? [
+              {
+                type: 'html' as const,
+                position: 'right' as const,
+                value: `<span class="navbar__item ipac-dev-search-note" aria-label="${t.devSearch}" title="${t.devSearch}">${t.devSearch}</span>`,
+              },
+            ]
+          : []),
+        {
+          type: 'localeDropdown',
+          position: 'right',
         },
         {
           href: DOCS_REPO,
           position: 'right',
           className: 'navbar-github-link',
           'aria-label': 'GitHub repository',
-          label: 'GitHub',
+          label: t.nav.github,
         },
       ],
     },
@@ -202,30 +371,30 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Start here',
+          title: t.footer.startHere,
           items: [
-            { to: '/docs/guides/introduction', label: 'Introduction' },
-            { to: '/docs/guides/getting-started/overview', label: 'Getting started' },
-            { to: '/docs/guides/architecture/system-overview', label: 'System architecture' },
+            { to: '/docs/guides/introduction', label: t.footer.introduction },
+            { to: '/docs/guides/getting-started/overview', label: t.footer.gettingStarted },
+            { to: '/docs/guides/architecture/system-overview', label: t.footer.systemArchitecture },
           ],
         },
         {
-          title: 'Reference',
+          title: t.footer.reference,
           items: [
-            { to: '/docs/reference/open-questions', label: 'Open questions' },
-            { to: '/docs/reference/documentation-status', label: 'Documentation status' },
-            { to: '/docs/adr/overview', label: 'Architectural decisions' },
+            { to: '/docs/reference/open-questions', label: t.footer.openQuestions },
+            { to: '/docs/reference/documentation-status', label: t.footer.documentationStatus },
+            { to: '/docs/adr/overview', label: t.footer.architecturalDecisions },
           ],
         },
         {
-          title: 'Repositories',
+          title: t.footer.repositories,
           items: [
             { href: REPOSITORIES['website'].url, label: 'website' },
             { href: DOCS_REPO, label: 'ipac-documentation' },
           ],
         },
       ],
-      copyright: `© ${new Date().getFullYear()} IPAC. Internal documentation — not for public distribution.`,
+      copyright: `© ${new Date().getFullYear()} IPAC. ${t.footer.copyright}`,
     },
     prism: {
       additionalLanguages: ['bash', 'sql', 'json', 'diff'],

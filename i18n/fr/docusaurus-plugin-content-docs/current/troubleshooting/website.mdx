@@ -1,0 +1,331 @@
+---
+title: "Dépannage website"
+sidebar_label: "website"
+description: "Diagnostiquer les problèmes de build, accès et déploiement website."
+---
+
+# website dépannage {#website-troubleshooting}
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:package.json',
+    'website:biome.json',
+    'website:.github/workflows/pr-validation.yml',
+    'website:.github/workflows/ci-cd.yml',
+    'website:src/lib/supabase.ts',
+    'website:src/hooks/usePageAccess.ts',
+    'website:git log',
+  ]}>
+  Failure modes sont traced depuis le dépôt scripts, its two CI workflows et its
+  fix history. W1 et W4 reflect patterns visible across many commits, ne a single
+  incident log.
+</Status>
+
+---
+
+## W1 — Build fails on Biome lint ou TypeScript errors {#w1}
+
+### Symptoms {#symptoms}
+
+`npm run build`, `npm run validate`, ou le CI job fails. Locally le dev server may
+have been running fine, parce que `vite dev` does ne typecheck.
+
+### Likely cause {#likely-cause}
+
+This est le **most frequent** failure mode dans this dépôt history — a long run
+de commits exists solely vers fix it, including *"fixed all lint et ts checks"*,
+*"Fix biome linting errors"*, *"fixed linting et typescript errors … commit avant
+deploying vers vercel"* et *"resolve lint a11y label associations"*.
+
+le reason it bites repeatedly: **`vite dev` type-checks nothing.** Type errors et
+lint violations only appear quand you explicitly run le checks, ou quand CI does.
+
+### Diagnosis {#diagnosis}
+
+Run le même checks CI runs, dans le même order:
+
+```bash
+npm run typecheck    # tsc --noEmit
+npm run lint         # biome check --write ./src   (see W3 — this WRITES)
+npm run build        # vite build
+```
+
+`npm run validate` est `typecheck` then `build`. Note it does **ne** include lint —
+so `validate` passing does ne mean CI va pass.
+
+### Resolution {#resolution}
+
+Fix le reported errors et re-run. Two repository-specific points:
+
+- **Biome config est ne stock.** `biome.json` disables several rules — including
+  `noExplicitAny`, `noNonNullAssertion`, `noLabelWithoutControl` et
+  `useButtonType` — so do ne assume a rule applies parce que Biome recommends it par
+  default. Check `biome.json` avant reworking code vers satisfy a rule that est off.
+- **`src/routeTree.gen.ts` est generated et excluded depuis Biome.** Do ne hand-edit
+  it, et do ne try vers lint it clean.
+
+### Do ne {#do-not}
+
+- **Do ne disable a lint rule vers get a build through** without reading why it fired.
+  Several rules sont already off; adding more erodes le only automated gate this
+  application has.
+- **Do ne skip `npm run lint` avant opening a PR** on le assumption CI covers it —
+  le PR workflow does **ne** run lint. See [W4](#w4).
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="website" path="package.json" />
+- <SourceRef repo="website" path="biome.json" />
+
+### Verification {#verification}
+
+`npm run typecheck && npm run lint && npm run build` all succeed.
+
+---
+
+## W2 — App crashes at startup: "Manquant Supabase environnement variables" {#w2}
+
+### Symptoms {#symptoms}
+
+le dev server starts, but le app throws immediately:
+`Missing Supabase environment variables`. A blank page ou an error overlay.
+
+### Likely cause {#likely-cause}
+
+le Supabase client **throws at module load** si either variable est absent:
+
+```ts
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables");
+}
+```
+
+Common triggers: non `.env` fichier (it est git-ignored, so a fresh clone has none); le
+fichier exists but le variables lack le `VITE_` prefix, so Vite does ne expose them;
+ou `.env` a été added while le dev server a été already running.
+
+### Diagnosis {#diagnosis}
+
+```bash
+ls -la .env                                  # exists?
+grep -c VITE_SUPABASE .env                   # expect 2
+```
+
+Variables doit be prefixed `VITE_` vers reach le browser. Unprefixed variables sont
+invisible vers client code par design.
+
+### Resolution {#resolution}
+
+```bash
+cp .env.example .env
+# fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+# then RESTART the dev server — Vite reads env at startup
+npm run dev
+```
+
+Values come depuis a team member ou a secret store, never depuis documentation. See
+[Environnement variables](/docs/guides/getting-started/environment-variables).
+
+### Do ne {#do-not}
+
+- **Do ne hardcode le URL et key** into `src/lib/supabase.ts` vers get moving.
+  Four committed scripts dans this dépôt already do this et it est recorded as a
+  finding ([M3](/docs/security/findings#m3)).
+- **Do ne commit `.env`.** It est git-ignored deliberately.
+- **Do ne put a service-role ou secret key dans a `VITE_` variable.** Anything
+  `VITE_`-prefixed ships vers le browser.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="website" path="src/lib/supabase.ts" />
+- <SourceRef repo="website" path=".env.example" />
+
+### Verification {#verification}
+
+le app loads et le login page renders.
+
+---
+
+## W3 — `npm run lint` modified my fichiers {#w3}
+
+### Symptoms {#symptoms}
+
+Running lint produces unexpected changes dans your working tree — reformatting, import
+reordering, automatic rule fixes.
+
+### Likely cause {#likely-cause}
+
+Ne a bug. le script est:
+
+```text
+lint: biome check --write ./src
+```
+
+`--write` signifie Biome **applies** fixes rather than only reporting them. Formatting
+utilise **tab** indentation per `biome.json`, so a fichier written avec spaces gets
+rewritten.
+
+### Diagnosis {#diagnosis}
+
+```bash
+git diff --stat      # see what lint changed
+```
+
+### Resolution {#resolution}
+
+Review le changes et keep them — they sont what CI expects. Si you want a
+report-only run, invoke Biome without `--write`:
+
+```bash
+npx biome check ./src
+```
+
+### Do ne {#do-not}
+
+- **Do ne commit lint changes mixed into an unrelated feature diff.** It makes
+  review harder. Commit formatting separately.
+- **Do ne "fix" le script par removing `--write`** — CI's production workflow runs
+  `npm run lint`, et auto-fixing there est what keeps formatting-only issues depuis
+  failing le déployer.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="website" path="package.json" />
+- <SourceRef repo="website" path="biome.json" />
+
+### Verification {#verification}
+
+`git diff` shows only intended changes, et `npm run lint` est a no-op on a second run.
+
+---
+
+## W4 — Passed PR validation, failed le production déployer {#w4}
+
+### Symptoms {#symptoms}
+
+A pull request goes green, est merged, et le production déployer then fails.
+
+### Likely cause {#likely-cause}
+
+**le two CI workflows sont ne le même**, et both differences peut produce exactly
+this outcome.
+
+| | `pr-validation.yml` | `ci-cd.yml` (production) |
+| --- | --- | --- |
+| Node | **22.x** | **24.x** |
+| Lint | **ne run** | **run** |
+| Typecheck | run | run |
+| Tests | run | run avec `continue-on-error: true` |
+| Build | run | run, then `vercel build --prod` et `vercel deploy --prebuilt` |
+
+So a lint violation est invisible until production, et le production build runs on a
+**différent Node major** depuis le one that validated le change.
+
+### Diagnosis {#diagnosis}
+
+Reproduce le production job locally, dans order:
+
+```bash
+node -v                # compare with 24.x, which production uses
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+Si `npm run lint` fails locally et le PR a été green, you have reproduced le gap.
+
+### Resolution {#resolution}
+
+Short term: run `npm run lint` yourself avant merging.
+
+Longer term, one de two changes closes le gap — a decision, ne a lookup:
+
+1. Add le lint step vers `pr-validation.yml`, et
+2. Align `NODE_VERSION` across both workflows.
+
+le Node divergence est tracked as [OQ-006](/docs/reference/open-questions#oq-006).
+Note also that tests do **ne** gate production — `continue-on-error: true` avec only
+two test fichiers dans le dépôt signifie le effective gate est lint, typecheck et
+build.
+
+### Do ne {#do-not}
+
+- **Do ne assume a green PR signifie a deployable change.** It currently does ne
+  guarantee lint passes.
+- **Do ne "fix" a déployer failure par re-running le job.** These sont deterministic
+  failures, ne flakes.
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="website" path=".github/workflows/pr-validation.yml" />
+- <SourceRef repo="website" path=".github/workflows/ci-cd.yml" />
+
+### Verification {#verification}
+
+Lint, typecheck, test et build all pass locally on le Node version production utilise.
+
+---
+
+## W5 — A page renders et then redirects away {#w5}
+
+### Symptoms {#symptoms}
+
+A protected page flashes into view avant le app navigates elsewhere — ou a utilisateur
+reaches a page you expected their rôle vers be blocked depuis.
+
+### Likely cause {#likely-cause}
+
+**Route guarding est a client-side effect, ne a gate.** `useRequirePageAccess` runs
+inside `useEffect`, so le component mounts et renders first, then redirects. It also
+returns early while `profile` est null, so nothing est decided until le rôle loads.
+
+Two consequences:
+
+- A brief render de protected markup est expected behaviour, ne a bug.
+- **`/inventory` calls non guard at all** — 13 sibling protected routes do, that one
+  does ne. Recorded as [H1](/docs/security/findings#h1).
+
+Whether le utilisateur peut actually *lu data* on such a page est decided par RLS. Use
+le live baseline dans
+[Live backend verification](/docs/backend/live-verification), then inspect le
+actuel policies pour le specific tables le page lit.
+
+### Diagnosis {#diagnosis}
+
+1. Check whether le route fichier calls `useRequirePageAccess`.
+2. Check le rôle against <SourceRef repo="website" path="src/lib/access.ts" /> —
+   full access est `admin`, `director`, `executive`, `sales`; `client` gets three
+   pages; `packer` et inconnu rôles get none.
+3. Remember le four enforcement layers disagree — see
+   [Rôles et permissions](/docs/website/roles-and-permissions).
+
+### Resolution {#resolution}
+
+- Manquant guard on a protected route: add `useRequirePageAccess()`, matching its
+  siblings.
+- Wrong rôle behaviour: this est likely le connu rôle divergence, ne a local bug.
+  Do ne "fix" it dans one layer only.
+
+### Do ne {#do-not}
+
+- **Do ne treat le client-side guard as a sécurité control.** It hides pages; it
+  does ne protect data. RLS est le boundary.
+- **Do ne add a rôle vers `FULL_ACCESS_ROLES` vers unblock someone.** Four independent
+  checks exist; changing one creates a new divergence.
+- **Do ne use `requireAdmin()` depuis `src/middleware/auth.ts`.** It performs **non**
+  rôle check et est called nowhere — see [M4](/docs/security/findings#m4).
+
+### Related fichiers {#related-files}
+
+- <SourceRef repo="website" path="src/hooks/usePageAccess.ts" />
+- <SourceRef repo="website" path="src/lib/access.ts" />
+
+### Verification {#verification}
+
+le page est reachable par le rôles it devrait be, et le route calls le guard.
+

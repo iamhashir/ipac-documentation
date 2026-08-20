@@ -1,0 +1,133 @@
+---
+title: "مصدر المخطط"
+sidebar_label: "مصدر المخطط"
+description: "أصل معلومات schema المستخدمة في التوثيق."
+---
+
+# Schema provenance {#schema-provenance}
+
+**قراءة this قبل trusting any schema fact on this site.**
+
+IPAC's قاعدة البيانات هو لا defined بواسطة its المستودعات. It هو defined بواسطة ال live
+Supabase project, و ال المستودعات contain only partial, dated echoes من it.
+This page states exactly what those echoes هي و how far each يمكن be trusted.
+
+<Status
+  type="verified"
+  date="2026-08-20"
+  sources={[
+    'website:src/types/supabase.ts',
+    'Mobile:supabase/migrations/20250121_add_team_lead_support.sql',
+    'website:Trail/packed-date-report-conflict-log.md',
+    'Supabase project fqynbudvpvpiljdrrvem',
+  ]}>
+  المستودع artifacts تم قراءة directly و compared مع read-only live
+  Supabase catalog results. الحالي live counts و policy summaries هي kept في
+  [Live backend verification](./live-verification).
+</Status>
+
+## ال three المصادر, ranked {#the-three-sources-ranked}
+
+### 1. Generated types — broad but stale {#1-generated-types-broad-but-stale}
+
+<SourceRef repo="website" path="src/types/supabase.ts" /> is a generated
+Supabase types ملف من 4,218 lines. It هو ال single most informative schema
+artifact في either المستودع, declaring **63 tables, 3 views, 49 functions,
+8 enums و 188 foreign keys** مع exact column types و nullability.
+
+**It هو provably out من date.** Live Supabase now تقارير 67 public tables, 83
+public functions و 11 enums. التطبيق code references قاعدة البيانات objects that
+ال ملف does لا declare:
+
+| المفقود من ال types ملف | مستخدم بواسطة |
+| --- | --- |
+| `order_item_allocation`, `destinations`, `allocation_increase_requests`, `signatures` | `website` |
+| `order_media` | `Mobile` |
+| `add_order_item_allocation`, `apply_order_item_allocations`, `upsert_order_item_allocation`, `set_allocation_expected`, `approve_allocation_increase_request`, `reject_allocation_increase_request`, `fetch_report_instances`, `fetch_instance_items` | `website` |
+
+ال allocation subsystem post-dates ال snapshot و هو live, except لـ
+`order_media`, which تم لا found as a live table أو Storage bucket. ال
+reporting RPC that `website` depends on has live overloads absent من ال
+snapshot. ال ملف carries no generation date, و nothing في either المستودع
+records عندما it تم produced أو بواسطة whom.
+
+**How إلى treat it:** as a lower bound on what exists, never as a description من
+what exists now. A table في ال ملف almost certainly exists; a table absent
+من ال ملف may well exist too.
+
+### 2. ال one migration — narrow but exact {#2-the-one-migration-narrow-but-exact}
+
+<SourceRef repo="Mobile" path="supabase/migrations/20250121_add_team_lead_support.sql" />
+هو ال **only** migration ملف في either المستودع. It هو exact و complete
+لـ what it touches: one column, one index, three `SECURITY DEFINER` functions
+مع their bodies و grants, و explicit RLS policies لـ two tables.
+
+It هو also ال only place في any المستودع where an RLS policy هو written down.
+
+### 3. Trail logs — narrative, و ال only record من some changes {#3-trail-logs-narrative-and-the-only-record-of-some-changes}
+
+`website/Trail/` و `Mobile/Trail/` هي incident logs. They هي prose, لا
+schema, but they record قاعدة البيانات changes that exist nowhere else — including a
+named migration applied إلى الإنتاج و later reverted.
+
+## ال قاعدة البيانات هو لا reproducible من ال المستودعات {#the-database-is-not-reproducible-from-the-repositories}
+
+This هو ال central fact, و it هو لا a suspicion — it هو documented.
+
+<Status type="verified" date="2026-08-19"
+  sources={['website:Trail/packed-date-report-conflict-log.md']}>
+  A migration named `prefer_instance_packed_at_in_reports` تم applied إلى ال
+  live project, replacing ال body من ال `fetch_report_instances` RPC, و تم
+  later reverted. **Neither ال migration nor its revert exists في any
+  المستودع.** ال log هو ال only record — see
+  [ADR-0003](/docs/adr/adr-0003-report-packed-date).
+</Status>
+
+Consequences, stated plainly:
+
+- **There هو no reviewable history.** 67 tables و 83 functions have one
+  migration between them. You cannot diff a schema change, و you cannot see
+  who changed what عندما.
+- **There هو no revert مسار.** Reverting ال change above meant manually
+  reapplying ال previous function body من memory أو من ال log.
+- **A fresh البيئة cannot be أنشئ.** There هو no sequence من ملفات that
+  produces this قاعدة البيانات, so there هو no staging البيئة that provably
+  matches الإنتاج, و no محلي قاعدة البيانات at all.
+- **`website` has no `supabase/` directory whatsoever.** Every schema change
+  made لـ ال web التطبيق هو unversioned.
+
+A second instance من ال نفس pattern: a migration ملف named
+`add_packing_start_completion_date_modes` exists as an **uncommitted** ملف في
+an older محلي checkout. It تم never committed إلى any المستودع.
+
+## What this يعني لـ reading these docs {#what-this-means-for-reading-these-docs}
+
+Pages on this site use three الحالة labels, و on backend topics they mean
+something specific:
+
+| Label | On a backend page it يعني |
+| --- | --- |
+| **تم التحقق** | قراءة directly من a المستودع ملف — ال types snapshot, ال migration, أو التطبيق code. ال claim هو about what ال المصدر says. |
+| **جزئيا تم التحقق** | Part من ال claim comes من المصدر; part هو inherited من prose that تم لا re-checked. |
+| **Requires live قاعدة البيانات verification** | المصدر cannot answer this. Do لا act on an assumption here. |
+
+Anything about **triggers, RLS on ال other ~61 tables, Storage bucket
+الإعداد, grants, أو الحالي object counts** falls into ال third category.
+No المستودع يحتوي that information.
+
+## Restoring reproducibility {#restoring-reproducibility}
+
+لا a documentation task, but ال documentation cannot become trustworthy
+without it. ال minimum viable change:
+
+1. **Adopt a migrations directory لـ `website`.** It has none.
+2. **Author changes as migration ملفات first**, then apply them — rather than
+   applying them إلى ال live project و naming them afterwards.
+3. **Baseline ال الحالي schema** بواسطة dumping it into a first migration, so
+   subsequent diffs mean something.
+4. **Regenerate ال types ملف as part من that baseline**, و record ال date.
+
+Until at least steps 1 و 4 happen, every backend page here has a shelf life
+measured في weeks. Tracked as
+[OQ-011](/docs/reference/open-questions#oq-011).
+

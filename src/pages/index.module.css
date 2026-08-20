@@ -1,4 +1,5 @@
 .main {
+  overflow-x: clip;
   background:
     linear-gradient(180deg, var(--ipac-surface-raised) 0, var(--ifm-background-color) 24rem),
     var(--ifm-background-color);
@@ -98,6 +99,8 @@
 }
 
 .architecture {
+  max-width: 100%;
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.45rem;
@@ -118,6 +121,11 @@
   text-align: center;
 }
 
+.clientNode,
+.supabaseNode a {
+  text-decoration: none;
+}
+
 .actor {
   background: var(--ipac-surface-raised);
   color: var(--ipac-muted);
@@ -125,9 +133,17 @@
 }
 
 .clientNode {
+  display: block;
   background: color-mix(in srgb, var(--ifm-color-primary) 10%, var(--ipac-surface));
   color: var(--ifm-color-primary-darkest);
   font-weight: 800;
+}
+
+.clientNode:hover,
+.supabaseNode a:hover {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  text-decoration: none;
 }
 
 html[data-theme='dark'] .clientNode {
@@ -139,15 +155,18 @@ html[data-theme='dark'] .clientNode {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.45rem;
   border-color: var(--ifm-color-primary);
-  text-align: left;
+  text-align: start;
+}
+
+.supabaseNode > a:first-child {
+  grid-column: 1 / -1;
 }
 
 .supabaseNode strong {
-  grid-column: 1 / -1;
   font-size: 1.05rem;
 }
 
-.supabaseNode span {
+.supabaseNode a {
   min-width: 0;
   border-radius: 4px;
   background: var(--ipac-surface-raised);
@@ -213,7 +232,7 @@ html[data-theme='dark'] .clientNode {
 
 .statusStats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.65rem;
   margin: 0;
 }
@@ -249,8 +268,15 @@ html[data-theme='dark'] .clientNode {
 }
 
 .statusFooter a {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-weight: 700;
+}
+
+:global([dir='rtl']) .supabaseNode strong,
+:global([dir='rtl']) .supabaseNode a,
+:global([dir='rtl']) .clientNode {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .section {
@@ -384,11 +410,26 @@ html[data-theme='dark'] .clientNode {
   }
 
   .statusFooter a {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
 }
 
 @media (max-width: 560px) {
+  .hero,
+  .section,
+  .sectionCompact,
+  .statusPanel {
+    width: min(100% - 1rem, 72rem);
+  }
+
+  .architecture {
+    padding: 0.75rem;
+  }
+
+  .supabaseNode {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .cardGrid,
   .intentGrid {
     grid-template-columns: minmax(0, 1fr);

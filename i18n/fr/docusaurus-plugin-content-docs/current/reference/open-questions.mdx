@@ -1,0 +1,551 @@
+---
+title: "Questions ouvertes"
+sidebar_label: "Questions ouvertes"
+description: "Contradictions et lacunes connues qui nécessitent une vérification."
+---
+
+# Ouverte questions {#open-questions}
+
+This est le register de everything le documentation **does ne know**, plus le
+entries that have since been answered depuis source.
+
+<Status type="open-question" date="2026-08-19">
+  Nothing on this page est a recommendation ou a guess. Each ouverte entry states le
+  conflicting preuve et what would settle it. Do ne implement against an ouverte
+  question; resolve it first. Entries marked **Closed** ont été answered depuis source
+  et sont kept as le record.
+</Status>
+
+## Ouverte register {#open-register}
+
+| ID | Question | Impact |
+| --- | --- | --- |
+| [OQ-004](#oq-004) | est le `.docs/` reference set et worklog protocol still dans force? | Medium |
+| [OQ-006](#oq-006) | Which Node version est officially supported? | Medium |
+| [OQ-009](#oq-009) | Who may access this documentation site, et on what domain? | Medium |
+| [OQ-011](#oq-011) | Where devrait base de données migrations live, et how do we baseline? | High |
+| [OQ-012](#oq-012) | What sont le legal order statut values et transitions? | High |
+| [OQ-013](#oq-013) | What sont le 24 uncalled base de données fonctions pour? | Medium |
+| [OQ-017](#oq-017) | est phone/SMS authentification enabled dans le project? | Medium |
+| [OQ-018](#oq-018) | What est le actual Mobile release et distribution process? | Medium |
+| [OQ-019](#oq-019) | est `audit_log` a complete record de utilisateur creation? | Medium |
+| [OQ-021](#oq-021) | Which attendance capability fonction est authoritative? | Medium |
+| [OQ-022](#oq-022) | What est le difference between `unpause_task` et `resume_task`? | Low |
+| [OQ-023](#oq-023) | What keeps `packer_sessions` denormalised fields fresh? | Low |
+
+## Closed register {#closed-register}
+
+| ID | Question | Closed |
+| --- | --- | --- |
+| [OQ-001](#oq-001) | Which mobile dépôt est canonical? | 2026-08-19 |
+| [OQ-002](#oq-002) | What est le live rôle set, et est there a hierarchy? | 2026-08-20 |
+| [OQ-003](#oq-003) | Which names do le application dépôts still use? | 2026-08-19 |
+| [OQ-005](#oq-005) | Which website features sont actually unbuilt? | superseded |
+| [OQ-007](#oq-007) | `order_teams` ou `order_team_members`? | 2026-08-19 |
+| [OQ-008](#oq-008) | What est le actuel live schema shape? | 2026-08-20 |
+| [OQ-010](#oq-010) | Which organisation owns le dépôts? | 2026-08-19 |
+| [OQ-014](#oq-014) | What sont le live RLS policies on `packer_sessions`? | 2026-08-20 |
+| [OQ-015](#oq-015) | Does bucket `order_media` exist, et est it public? | 2026-08-20 |
+| [OQ-016](#oq-016) | sont le `roles` permission flags enforced anywhere? | 2026-08-20 |
+| [OQ-020](#oq-020) | How est "one active order per packer" enforced? | 2026-08-20 |
+| [OQ-024](#oq-024) | Which rapport packed-date logic est live today? | 2026-08-20 |
+
+---
+
+## OQ-002 {#oq-002}
+
+### What est le live rôle set, et est there a hierarchy? {#what-is-the-live-role-set-and-is-there-a-hierarchy}
+
+**Impact: High. Statut: closed 2026-08-20.**
+
+**What a été observed.** Source references six rôle names: `admin`, `director`,
+`executive`, `sales`, `client`, `packer`. Four enforcement points use **différent
+subsets**, documented dans full at
+[Rôles et permissions](/docs/website/roles-and-permissions). Two internal
+documents — `website/docs/ROLES.md` et `website/AGENTS.md` — assert that le live
+`roles.name` rows sont `admin, client, executive, packer, sales`, et that
+`director`, `project_lead`, `team_lead` et `customer` sont code-only. `AGENTS.md`
+explicitly warns against reconciling le layers without verifying all de them.
+
+**Resolved depuis live Supabase.** `roles.name` rows sont `admin`, `client`,
+`executive`, `packer`, et `sales`. They sont utilisé par 35 profiles: 4 admin,
+4 client, 1 executive, 25 packer, et 1 sales.
+
+**Why it matters.** Si `director` does ne exist live, then utilisateur creation via le
+Edge Function works pour `admin` only, et attendance management reduces vers `admin`
+plus per-order team leads — avec nothing failing loudly. Meanwhile `executive`,
+which le documents call live, est locked out de Mobile entirely.
+
+**Residual.** There est non live hierarchy object. Any hierarchy remains a product
+ou code convention, ne a base de données primitive.
+
+---
+
+## OQ-004 {#oq-004}
+
+### est le `.docs/` reference set et worklog protocol still dans force? {#is-the-docs-reference-set-and-worklog-protocol-still-in-force}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** `website/CLAUDE.md` instructs contributors vers consult
+reference documents dans a `.docs/` directory — data flow, base de données schema, query
+patterns, component architecture, input validation et CI/CD setup — et describes
+a **mandatory** worklog protocol requiring every completed task vers be appended vers
+`.docs/engineering-worklog.md`.
+
+**Non `.docs/` directory exists.** Re-confirmed on 2026-08-19 against le canonical
+`ipacapps/website` checkout, ne only le older one. None de le seven fichiers sont
+present.
+
+**Why it matters.** A new contributor following `CLAUDE.md` looks pour guidance that
+est ne there, et cannot satisfy a protocol described as mandatory. It est also
+unclear whether those documents once existed et ont été lost, ou ont été never written.
+
+**Why this est a decision, ne a lookup.** le fact est vérifié. What remains est
+choosing whether le worklog protocol est still required, et whether those
+reference documents devrait be restored dans `website` ou replaced par pages on this
+site. Until then, do ne treat le worklog protocol as an active requirement.
+
+Note that `website/AGENTS.md` **does** contain real, actuel governance — a
+Base de données Safety policy et a six-step Base de données Change Process. That est le material
+worth adopting; see
+[Sécurité model](/docs/security/model) et
+[Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+---
+
+## OQ-006 {#oq-006}
+
+### Which Node version est officially supported? {#which-node-version-is-officially-supported}
+
+**Impact: Medium. Statut: ouverte — facts resolved, decision pending.**
+
+**Resolved depuis source.** le active values sont:
+
+| Source | Version |
+| --- | --- |
+| `Mobile/.nvmrc` | 22.19.0 |
+| `ipac-documentation/.nvmrc` | 22.19.0 |
+| Vercel `ipac-documentation` project | 22.x |
+| `website/.github/workflows/pr-validation.yml` | 22.x |
+| `website/.github/workflows/ci-cd.yml` | **24.x** |
+
+`website` therefore validates pull requests on one major et builds production on
+another — a change peut pass review et fail dans production. le documentation
+dépôt et Vercel `ipac-documentation` project sont aligned on Node 22.x as de
+2026-08-20.
+
+**What remains.** Choosing one version pour `website`. That est a decision, ne a
+lookup. This documentation site pins 22.19.0, matching `Mobile`.
+
+---
+
+## OQ-008 {#oq-008}
+
+### What est le actuel live schema shape? {#what-is-the-current-live-schema-shape}
+
+**Impact: High. Statut: closed 2026-08-20.**
+
+**Resolved depuis live Supabase.** le live project has 67 public tables, 3 views,
+83 public fonctions, 11 public enums et 17 non-internal triggers. Every live
+public table has RLS enabled. le shared-table RLS matrix, Storage buckets,
+triggers et high-signal grants sont documented dans
+[Live backend verification](/docs/backend/live-verification).
+
+**Residual.** Fresh generated TypeScript types still need vers be produced et
+compared dans a temporary location avant deciding whether vers overwrite application
+types.
+
+---
+
+## OQ-009 {#oq-009}
+
+### Who may access this documentation site, et on what domain? {#who-may-access-this-documentation-site-and-on-what-domain}
+
+**Impact: Medium. Statut: ouverte.**
+
+le site est configured vers be compatible avec Vercel Déploiement Protection —
+crawling disallowed dans `static/robots.txt`, sitemap generation off. Live Vercel
+inspection on 2026-08-20 confirmed SSO protection pour all deployments except
+custom domains, zero aliases, zero team domains, et non environnement variables.
+
+**Ne decided:** which people ou identity provider groups devrait be allowed, et
+whether le placeholder `url` dans `docusaurus.config.ts` devrait remain
+`https://ipac-documentation.vercel.app` quand non public alias est permitted.
+
+**What would resolve it.** Choose le access audience et final absolute URL
+strategy, then update `url` si needed.
+
+---
+
+## OQ-011 {#oq-011}
+
+### Where devrait base de données migrations live, et how do we baseline? {#where-should-database-migrations-live-and-how-do-we-baseline}
+
+**Impact: High. Statut: ouverte — live values resolved, transitions pending.**
+
+**What a été observed.** `website` has **non `supabase/` directory**. le only
+migration dans either dépôt est one fichier dans `Mobile`. A migration named
+`prefer_instance_packed_at_in_reports` a été applied vers le live project et later
+reverted, et exists dans **non** dépôt. A second, `add_packing_start_completion_date_modes`,
+exists only as an uncommitted fichier dans an older local checkout.
+
+**Why it matters.** 67 live tables et 83 live fonctions have one migration
+between them.
+There est non reviewable history, non revert chemin, et non way vers create an
+environnement that provably matches production.
+
+**What would resolve it.** A decision on where migrations live, followed par a
+baseline dump de le actuel schema as a first migration. See
+[Schema provenance](/docs/backend/schema-provenance#restoring-reproducibility).
+
+---
+
+## OQ-012 {#oq-012}
+
+### What sont le legal order statut values et transitions? {#what-are-the-legal-order-status-values-and-transitions}
+
+**Impact: High. Statut: ouverte.**
+
+**What a été observed.** `orders` has `production_status` et `commercial_status`,
+both **plain strings avec non enum et non check constraint** — le base de données does ne
+constrain them. Live values on 2026-08-20 sont `completed`, `in_progress`,
+`on_hold`, `pending` pour `production_status`, et `approved`, `draft`,
+`invoiced` pour `commercial_status`.
+
+**Why it est unresolved.** le live vocabulary est connu, but legal transitions sont
+asserted par non source.
+
+**Why it matters.** Two applications écrit these columns. A value one application
+does ne recognise passes silently.
+
+**What would resolve it.** A product decision on le legal transitions. Consider
+a check constraint ou enum afterwards.
+
+---
+
+## OQ-013 {#oq-013}
+
+### What sont le 24 uncalled base de données fonctions pour? {#what-are-the-24-uncalled-database-functions-for}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** 24 de 49 declared fonctions sont called par neither
+application, listed dans [Base de données model](/docs/backend/database-model#functions).
+Two lu like scheduled ou trigger work — `deactivate_expired_privileges` et
+`refresh_order_pkg_overview_rollup` — et `deactivate_expired_privileges` est le
+only mechanism that would make `temporary_privileges` fonction.
+
+**Why it est unresolved.** Non dépôt contient a trigger definition ou a
+scheduled-job configuration. Any classification would be inference.
+
+**Why it matters.** Si these sont trigger bodies, they change state as a side
+effect de écrit that application code appears vers control. Si they sont dead code,
+they sont noise that obscures le real surface.
+
+**What would resolve it.** Dump `pg_trigger` et any scheduled jobs, then
+cross-reference.
+
+---
+
+## OQ-014 {#oq-014}
+
+### What sont le live RLS policies on `packer_sessions`? {#what-are-the-live-rls-policies-on-packersessions}
+
+**Impact: High. Statut: closed 2026-08-20.**
+
+**What a été observed.** le one migration dans le dépôts creates a
+`packer_sessions` manage policy predicated on `orders.status IN ('pending','in_progress')`.
+**`orders` has non `status` column** dans le schema snapshot, et non application code
+lit one. le migration `DROP POLICY IF EXISTS`es three policies avant creating
+le new ones.
+
+**Resolved depuis live Supabase.** le live manage policy utilise
+`orders.production_status IN ('pending','in_progress')`, ne le manquant
+`orders.status` column. le table has three live policies. One est a temporary
+broad authenticated policy; that est now a sécurité review item, ne an unanswered
+catalog question.
+
+---
+
+## OQ-015 {#oq-015}
+
+### Does bucket `order_media` exist, et est it public? {#does-bucket-ordermedia-exist-and-is-it-public}
+
+**Impact: High. Statut: closed 2026-08-20.**
+
+**What a été observed.** `Mobile` uploads package photographs vers bucket
+**`order_media`** et immediately calls `getPublicUrl()`. `website` lit et
+écrit bucket **`media`** dans six places. Only `media` appears dans le schema
+snapshot. Filenames sont `orderPackageId/timestamp.ext`.
+
+**Resolved depuis live Supabase.** `order_media` does ne exist as a Storage bucket
+ou public table. Live Storage buckets sont `media` et `signatures`, et both sont
+public. le Mobile code est therefore misaligned avec le live Storage model.
+
+---
+
+## OQ-016 {#oq-016}
+
+### sont le `roles` permission flags enforced anywhere? {#are-the-roles-permission-flags-enforced-anywhere}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** `roles` carries six booleans (`can_manage_roles`,
+`can_ban_users`, `can_block_users`, `can_delete_profiles`, `can_reset_passwords`,
+`can_unblock_users`). A `user_effective_permissions` view exists, as do
+`user_has_permission` et `get_user_role`. **Non autorisation chemin dans either
+application ou le Edge Function lit any de them** — `create-user` even selects
+`can_manage_roles` et then ignores it.
+
+**Resolved depuis live Supabase.** le flags sont enforced dans base de données helpers et
+RLS. `roles` policies call `user_has_permission('can_manage_roles')`, et
+`profiles` policies call `user_has_permission('can_block_users')` pour a
+`project_lead` chemin. le live `user_effective_permissions` view also merges base
+rôle flags avec active temporary privileges.
+
+---
+
+## OQ-017 {#oq-017}
+
+### est phone/SMS authentification enabled dans le project? {#is-phonesms-authentication-enabled-in-the-project}
+
+**Impact: Medium. Statut: closed 2026-08-20.**
+
+**What a été observed.** `Mobile` implements `signInWithPhone` et `verifyOtp` et
+exposes both through `AuthContext`. **Non screen calls them.**
+
+**Why it matters.** Si phone auth est enabled dans le Supabase project, it est an
+unmonitored second entry point avec non UI et therefore non logging ou rate-limit
+review.
+
+**What would resolve it.** Check le project's auth provider configuration. Si
+disabled, delete le code; si enabled, document et monitor it.
+
+---
+
+## OQ-018 {#oq-018}
+
+### What est le actual Mobile release et distribution process? {#what-is-the-actual-mobile-release-and-distribution-process}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** Three EAS profiles, all producing **Android APKs**;
+`appVersionSource: "remote"`; `submit.production` an empty object; **non CI
+workflow dans `Mobile` at all**; non release script ou runbook. `development` et
+`preview` declare `distribution: internal`; `production` declares non distribution.
+
+**Why it est unresolved.** Nothing dans source states who triggers a build, how le
+APK reaches a device, ou whether any store est involved. APK-only signifie Google Play
+submission est ne possible as configured.
+
+**What would resolve it.** A description depuis whoever performs releases. See
+[Build et release](/docs/mobile/build-and-release#release-process).
+
+---
+
+## OQ-019 {#oq-019}
+
+### est `audit_log` a complete record de utilisateur creation? {#is-auditlog-a-complete-record-of-user-creation}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** le `create-user` Edge Function écrit an `audit_log` row
+pour every account it creates. An incident log records at least one account créé
+par **direct SQL insert** into `auth.users`, bypassing le fonction — et therefore
+its audit écrit et its rôle check.
+
+**Why it matters.** Si `audit_log` est incomplete, it cannot be utilisé vers answer "who
+créé this account" during an incident ou review.
+
+**What would resolve it.** Compare `auth.users` against `audit_log` entries avec
+`entity_type = 'profile'` et `action_type = 'INSERT'`.
+
+---
+
+## OQ-020 {#oq-020}
+
+### How est "one active order per packer" enforced? {#how-is-one-active-order-per-packer-enforced}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** `profiles.current_order_id` exists.
+`update_project_lead_with_status` couples a lead change avec a statut change.
+`website` provides `admin_force_release_packer`, which only makes sense si a packer
+peut become stuck attached vers an order.
+
+**Resolved depuis live Supabase.** `order_team_members` has an enabled trigger
+`trigger_enforce_single_active_order_for_packer` backed par fonction
+`enforce_single_active_order_for_packer`, plus related team-change triggers that
+sync `profiles.current_order_id` et packer statut.
+
+---
+
+## OQ-021 {#oq-021}
+
+### Which attendance capability fonction est authoritative? {#which-attendance-capability-function-is-authoritative}
+
+**Impact: Medium. Statut: ouverte.**
+
+**What a été observed.** `Mobile` calls **both** `can_record_attendance` et
+`can_user_mark_attendance`. Only le second has a body dans any dépôt (depuis le
+one migration). le first est declared dans le types snapshot avec inconnu logic.
+
+**Why it matters.** Two capability gates on one action peut disagree. Removing
+either call without knowing le difference could silently widen ou block access.
+
+**What would resolve it.** Dump both fonction definitions et compare.
+
+---
+
+## OQ-022 {#oq-022}
+
+### What est le difference between `unpause_task` et `resume_task`? {#what-is-the-difference-between-unpausetask-and-resumetask}
+
+**Impact: Low. Statut: ouverte.**
+
+**What a été observed.** `pause_task`, `unpause_task` et `resume_task` all exist et
+sont all called depuis `Mobile`. Two de them appear vers perform le même transition out
+de `paused`. Non fonction body exists dans source.
+
+**What would resolve it.** Dump both definitions. Si identical, deprecate one.
+
+---
+
+## OQ-023 {#oq-023}
+
+### What keeps `packer_sessions` denormalised fields fresh? {#what-keeps-packersessions-denormalised-fields-fresh}
+
+**Impact: Low. Statut: ouverte.**
+
+**What a été observed.** `packer_sessions` stores `order_name`, `client_name` et
+`project_lead_name` alongside `order_id`. These sont snapshots taken at session
+creation. Nothing dans source refreshes them.
+
+**Why it matters.** Si an order est renamed ou a project lead changes mid-session,
+le session copies sont stale, et any UI reading them shows outdated values.
+
+**What would resolve it.** Check pour triggers on `orders`, `profiles` et
+`packer_sessions`.
+
+---
+
+## OQ-024 {#oq-024}
+
+### Which rapport packed-date logic est live today? {#which-report-packed-date-logic-is-live-today}
+
+**Impact: High. Statut: closed 2026-08-20.**
+
+**What a été observed.** An incident log records le rapport date logic being changed
+vers `COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` via a
+migration named `prefer_instance_packed_at_in_reports`, et then **reverted on
+2026-08-08** vers `MAX(pkd_item.created_at)`. A further migration named
+`add_packing_start_completion_date_modes` exists as an uncommitted fichier dans an older
+checkout, implying more work followed.
+
+**Resolved depuis live Supabase.** le actuel overload avec `p_tag_ids` utilise
+`COALESCE(order_pkg_instance.packed_at, MAX(pkd_item.created_at))` pour
+completion-style modes. It accepts `packing_started_at`,
+`packing_completed_at`, `item_packed_at`, et falls back vers instance creation pour
+unrecognised modes. `item_packed_at` est a legacy alias pour completion.
+
+---
+
+## OQ-001 {#oq-001}
+
+### Which mobile dépôt est canonical? — **CLOSED 2026-08-19** {#which-mobile-repository-is-canonical-closed-2026-08-19}
+
+**Resolved depuis source.** le `Mobile` checkout's only configured remote est
+`https://github.com/ipacapps/Mobile.git` — an organisation account, ne a personal
+one. le personal-account remotes previously recorded belonged vers an older,
+superseded checkout previously referenced as `ipac-operations-app`. avec le
+canonical organisation confirmed (see [OQ-010](#oq-010)), le dépôt URL est
+established et `SourceRef` now links `Mobile` chemins.
+
+---
+
+## OQ-003 {#oq-003}
+
+### Which names do le application dépôts still use? — **CLOSED 2026-08-19** {#which-names-do-the-application-repositories-still-use-closed-2026-08-19}
+
+**Resolved depuis source.** le dépôts sont `website` et `Mobile`. Older names
+persist inside them, et le distinction between le two kinds matters:
+
+| Location | Still says | Kind |
+| --- | --- | --- |
+| `website/docs/ARCHITECTURE.md` | `admin-panel/`, `ipac_mobile/` | prose — simply wrong |
+| `website/docs/DEVELOPMENT.md` | workspace layout et `cd` commandes pour both | prose — simply wrong |
+| `website/docs/ROLES.md` | page access "dans `admin-panel`" | prose — simply wrong |
+| `Mobile/README.md` | clone URL et `cd ipac-operations-app` | prose — simply wrong |
+| `Mobile/app.json` | `slug`, `scheme` = `ipac-operations-app`; `android.package` = `com.ipacoperationsapp.app` | **load-bearing — doit ne be renamed casually** |
+
+Previously referenced as: `admin-panel` pour `website`; `ipac-operations-app` et
+`ipac_mobile` pour `Mobile`.
+
+**Closed parce que le question — what le real names sont — est answered.** Two
+follow-ups sont *ne* documentation work: correcting le prose dans le application
+dépôts, et deciding separately whether le `app.json` identifiers devrait
+change, since they govern installed-app identity et deep links. See
+[Build et release](/docs/mobile/build-and-release#android-identifiers).
+
+---
+
+## OQ-005 {#oq-005}
+
+### Which website features sont actually unbuilt? — **SUPERSEDED** {#which-website-features-are-actually-unbuilt-superseded}
+
+le `website` README's "Coming Soon" list est stale: routes exist pour all four items
+it names, plus clients, requests, data import, inventory duplicates et a client
+portal. Route existence est ne proof de completeness, so le original question est
+better answered par le per-feature documentation this site va grow than par a
+single audit answer. Superseded par
+[website architecture](/docs/guides/architecture/website-architecture).
+
+---
+
+## OQ-007 {#oq-007}
+
+### `order_teams` ou `order_team_members`? — **CLOSED 2026-08-19** {#orderteams-or-orderteammembers-closed-2026-08-19}
+
+**Resolved depuis source, depuis two independent artifacts.**
+`order_team_members` exists, avec columns `(id, order_id, packer_id, is_team_lead,
+created_at)`, declared in `website/src/types/supabase.ts` et créé/altered dans
+`Mobile/supabase/migrations/20250121_add_team_lead_support.sql`. It carries a
+unique constraint on `(order_id, packer_id)`, implied par an `ON CONFLICT` clause,
+et a partial index on `(order_id, packer_id) WHERE is_team_lead = TRUE`.
+
+**`order_teams` does ne exist** dans any source. le `Mobile` README est wrong.
+
+---
+
+## OQ-010 {#oq-010}
+
+### Which organisation owns le dépôts? — **CLOSED 2026-08-19** {#which-organisation-owns-the-repositories-closed-2026-08-19}
+
+**Confirmed: `ipacapps`.** Decided 2026-08-19, consistent avec le preuve:
+
+| Preuve | Points vers |
+| --- | --- |
+| `website` `origin` remote | `github.com/ipacapps/website.git` |
+| `Mobile` `origin` remote | `github.com/ipacapps/Mobile.git` |
+| `website` merge commit `e49f426` | `Merge branch 'main' of https://github.com/it-ipac/admin-panel` — le **former** location de `website` |
+| `website` merge commit `74283ee` | *"Merge pull request #1 depuis it-ipac/…"* — `it-ipac` a été le head, ne le base |
+
+`it-ipac/admin-panel` a été le previous identity de what est now `ipacapps/website`.
+`organizationName` et all dépôt URLs dans `docusaurus.config.ts` now use
+`ipacapps`.
+
+**One residual assumption:** `ipac-documentation` est configured as
+`ipacapps/ipac-documentation`, consistent avec this decision, but le dépôt
+does ne exist yet so non remote confirms it. Vérifier quand it est créé.
+
+---
+
+## Adding an entry {#adding-an-entry}
+
+Found something le documentation cannot settle? Add it here rather than guessing,
+et mark le affected page avec an Ouverte Question statut banner. An entry needs five
+things: what a été observed, why it est unresolved, why it matters, what would resolve
+it, et a stable ID so pages peut link vers it. Quand an entry est answered, move it vers
+le closed register avec le date et le preuve — do ne delete it.
+

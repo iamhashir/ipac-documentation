@@ -1,0 +1,35 @@
+---
+title: Votre premier changement
+sidebar_label: Votre premier changement
+description: Parcours pratique pour faire une petite modification IPAC sans casser l autre application.
+---
+
+<header>
+# Votre premier changement
+</header>
+
+<Status type="verified" date="2026-08-19">
+  Cette traduction conserve les termes techniques et les niveaux de risque de la source anglaise.
+</Status>
+
+Avant de coder, répondez à deux questions :
+
+1. La modification touche-t-elle **Mobile**, **website** ou le backend partagé ?
+2. La modification lit-elle ou écrit-elle une table, un RPC, Auth, Storage, RLS ou des rôles utilisés par l autre application ?
+
+## Niveaux de risque
+
+| Niveau | Indication |
+| --- | --- |
+| LOW | Changement UI local sans donnée partagée. |
+| MEDIUM | Changement qui lit ou affiche une donnée partagée existante. |
+| HIGH | Changement sur Auth, roles, RLS, Storage, RPC, schema ou vocabulaire de statut partagé. |
+
+## Règle
+
+Les deux applications partagent un seul projet Supabase. Une hypothèse changée dans une application peut casser l autre sans erreur évidente. Pour les détails complets et les commandes exactes, utilisez la page anglaise canonique.
+
+## La documentation doit-elle changer ? {#step-11}
+
+Si votre modification change un comportement, un flux, une commande, une variable d environnement, un modèle de sécurité ou une hypothèse cross-app, mettez à jour `ipac-documentation` dans le même changement.
+

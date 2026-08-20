@@ -1,0 +1,189 @@
+---
+title: "ADR-0001: framework website"
+sidebar_label: "ADR-0001"
+description: "لماذا يستخدم website ‏TanStack Start بدلا من Expo Web."
+---
+
+# ADR-0001 — Web التطبيق framework: Expo Web إلى TanStack Start {#adr-0001-web-application-framework-expo-web-to-tanstack-start}
+
+```text
+Status:              Accepted
+Date:                2026-02-06 (first commit of the rewrite)
+Decision owners:     Not recorded
+Evidence confidence: HIGH — the motivation is stated in the repository itself
+```
+
+<Status
+  type="verified"
+  date="2026-08-19"
+  sources={[
+    'website:README.md',
+    'website:package.json',
+    'website:nitro.config.ts',
+    'website:git log',
+    'Mobile:package.json',
+    'Mobile:app.json',
+  ]}>
+  Unusually لـ IPAC, this decision's **rationale هو written down في ال المستودع**
+  — `website/README.md` states ال problem و ال expected improvement explicitly.
+  That هو why this ADR يمكن be Accepted rather than Historical. Individual performance
+  figures هي ال المستودع own claims, لا independently measured.
+</Status>
+
+## Context {#context}
+
+ال IPAC admin interface تم originally built مع **Expo Web (React Native Web)** —
+ال نفس stack as ال field التطبيق, sharing its component model. That let one
+codebase target native و web.
+
+`Mobile` still carries that capability: `react-native-web` هو a dependency, و
+`app.json` configures a web target مع ال Metro bundler و `static` output. ال
+`(admin)` route group في `Mobile` also still يحتوي administrative screens, و ال
+المستودع own الهندسة notes warn that these older mobile admin screens still
+exist و that الحالي usage ينبغي be تم التحقق قبل treating them as intended
+الهندسة.
+
+## Problem {#problem}
+
+Stated verbatim في <SourceRef repo="website" path="README.md" />:
+
+> ال original admin panel تم built مع Expo Web (React Native Web), which had
+> severe performance issues:
+>
+> - **LCP من 30-80 seconds** due إلى massive bundle size
+> - No SSR/SSG - everything client-side rendered
+> - Font loading blocked rendering
+> - Cascading auth checks caused waterfall requests
+
+An LCP measured في **tens من seconds** هو لا a tuning problem. React Native Web
+ships a native-oriented component و styling runtime إلى ال browser, و ال
+resulting bundle هو described as ~2–5 MB. Four distinct causes هي named: bundle
+size, absence من server rendering, render-blocking fonts, و sequential
+المصادقة requests.
+
+## Decision {#decision}
+
+Rebuild ال admin interface as a **separate web التطبيق on TanStack Start**,
+abandoning code sharing مع ال React Native التطبيق.
+
+ال stack, تم التحقق من <SourceRef repo="website" path="package.json" />:
+
+| Concern | Choice |
+| --- | --- |
+| Framework | TanStack Start مع TanStack Router |
+| Server data | TanStack Query, مع SSR query integration |
+| Build | Vite 7 |
+| Server runtime | Nitro, preset `vercel` (<SourceRef repo="website" path="nitro.config.ts" />) |
+| UI | React 19, Tailwind CSS 4, DaisyUI, Radix primitives |
+| Validation | Zod |
+| Quality | Vitest, Biome |
+
+ال rewrite هو clean: `website/package.json` يحتوي **no** `react-native` أو `expo`
+dependency. ال first commit هو dated **2026-02-06**, authored بواسطة `ax7k`.
+
+ال expected improvement, again من ال README:
+
+> - **Sub-second LCP** مع SSR و streaming
+> - **~100-200KB initial bundle** vs ~2-5MB
+> - Built-في caching مع TanStack Query
+> - Type-safe routing مع TanStack Router
+
+## Alternatives {#alternatives}
+
+**لا recorded.**
+
+No المستودع artifact evaluates alternatives. Optimising Expo Web في place, أو
+choosing a مختلف SSR framework, may have been considered — nothing states it.
+ال four named causes suggest server rendering تم treated as ال necessary remedy,
+but that هو inference و هو لا documented as a comparison.
+
+## Consequences {#consequences}
+
+### Positive {#positive}
+
+- **Server rendering و streaming became possible**, addressing ال root cause
+  rather than ال symptom.
+- **A web-appropriate UI stack.** Tailwind, DaisyUI و Radix replace native-oriented
+  primitives, و Radix brings accessible component behaviour that React Native Web
+  does لا provide.
+- **Type-safe routing** مع generated route types.
+- **Real quality gates.** `website` has typecheck, lint, tests و two CI workflows.
+  `Mobile` has none من these — see
+  [Build و release](/docs/mobile/build-and-release).
+- **ال web التطبيق grew far beyond an admin panel.** It now carries 20 internal
+  routes plus a 5-route client portal, a server webhook, و a 12,186-line reporting
+  module — scope that ال original shared-code approach would have struggled إلى
+  support.
+
+### Negative {#negative}
+
+- **Two codebases, no مشترك UI.** Every مشترك concept يجب be implemented twice.
+  There هو no مشترك component library, no مشترك validation, no مشترك types
+  package.
+- **ال التطبيقات diverged في quality practice**, لا just في code. One has
+  automated gates و CI; ال other has neither.
+- **Duplicated domain logic.** Both التطبيقات independently construct Supabase
+  queries against ال نفس 26 مشترك tables, و both hardcode role checks — see
+  [ADR-0003](./adr-0003-report-packed-date) و
+  [Roles و permissions](/docs/website/roles-and-permissions).
+- **ال old surface تم لا removed.** Administrative screens still exist في `Mobile`,
+  so لـ some workflows it هو unclear which التطبيق هو authoritative.
+
+### المخاطر {#risks}
+
+- **Overlapping admin surfaces.** Until ال `Mobile` `(admin)` screens هي confirmed
+  legacy أو الحالي, a change may need making في two places — أو may be made في ال
+  wrong one.
+- **Divergence accelerates.** مع no مشترك contract layer و only one مشترك RPC,
+  ال two التطبيقات يمكن drift apart silently. See
+  [Cross-application architecture](/docs/guides/architecture/cross-app).
+- **ال performance claims هي unverified.** "Sub-second LCP" هو ال المستودع
+  stated expectation. No measurement exists في either المستودع. `web-vitals` هو a
+  dev dependency, so instrumentation may exist, but no results هي recorded.
+- **Size discipline تم لا carried over.** ال المستودع sets a 400-line hard limit
+  و has ملفات من 4,218, 3,595 و 2,765 lines.
+
+## الحالي State {#current-state}
+
+**في effect.** `website` هو ال الإنتاج admin التطبيق, deployed إلى Vercel via
+GitHub Actions, و has been developed continuously من 2026-02-06 إلى at least
+2026-08-11.
+
+ال decision هو settled. Two من its consequences هي لا:
+
+1. Whether ال `Mobile` `(admin)` screens هي legacy أو still authoritative لـ any
+   workflow.
+2. Whether ال performance goals تم met — no measurement هو recorded.
+
+## الدليل {#evidence}
+
+| Claim | المصدر | Confidence |
+| --- | --- | --- |
+| Prior stack تم Expo Web / React Native Web | `website/README.md`; `Mobile` retains `react-native-web` و a web target في `app.json` | تم التحقق |
+| LCP 30–80s, ~2–5 MB bundle, no SSR, blocking fonts, waterfall auth | `website/README.md` — ال المستودع own claim | تم التحقق as a stated claim, لا as a measurement |
+| الحالي stack | `website/package.json`, `nitro.config.ts` | تم التحقق |
+| Clean rewrite, no RN/Expo dependency | `website/package.json` يحتوي no match لـ `react-native` أو `expo` | تم التحقق |
+| Rewrite began 2026-02-06 | `git log --reverse`, commit `7d7c391` بواسطة `ax7k` | تم التحقق |
+| Older mobile admin screens still exist | `Mobile/app/(admin)/`; تحذير في `website/docs/ARCHITECTURE.md` | تم التحقق |
+| Sub-second LCP achieved | — | **لا تم التحقق** — no measurement في either المستودع |
+| Who made ال decision | — | **لا recorded** |
+| Alternatives considered | — | **لا recorded** |
+
+## Related Documentation {#related-documentation}
+
+- [website architecture](/docs/guides/architecture/website-architecture)
+- [Mobile architecture](/docs/guides/architecture/mobile-architecture)
+- [Cross-application architecture](/docs/guides/architecture/cross-app)
+- [ADR-0002 — المستودع migration](./adr-0002-repository-migration)
+
+## مفتوح أسئلة {#open-questions}
+
+- **هي ال `Mobile` `(admin)` screens legacy أو الحالي?** لا tracked as a numbered
+  مفتوح سؤال; it needs a product answer, و it determines whether a workflow has
+  one home أو two.
+- **تم ال performance goals met?** No measurement exists. إذا it matters, measure
+  قبل assuming.
+- [OQ-005](/docs/reference/open-questions#oq-005) — ال README's feature الحالة هو
+  stale, which هو a reminder that this نفس README's performance claims هي equally
+  undated.
+

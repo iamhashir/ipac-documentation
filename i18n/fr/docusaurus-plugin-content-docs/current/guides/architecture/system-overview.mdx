@@ -1,0 +1,34 @@
+---
+title: Architecture système
+sidebar_label: Vue d ensemble
+description: Vue d ensemble de l architecture IPAC.
+---
+
+<header>
+# Architecture système
+</header>
+
+<Status type="verified" date="2026-08-19">
+  Cette page localisée garde les diagrammes et identifiants techniques inchangés.
+</Status>
+
+IPAC combine deux clients applicatifs avec un backend Supabase partagé :
+
+```mermaid
+flowchart TB
+  Mobile["Mobile"] --> Supabase["Supabase<br/>Auth / PostgreSQL / RLS / Storage"]
+  Website["website"] --> Supabase
+  Supabase --> Mobile
+  Supabase --> Website
+```
+
+| Couche | Responsabilité |
+| --- | --- |
+| Mobile | Opérations terrain, écrans admin et packer. |
+| website | Gestion, administration et vues client restreintes. |
+| Supabase | Auth, PostgreSQL, RLS, Storage, RPC / Functions. |
+
+## Point central
+
+Le backend partagé est la contrainte architecturale principale. Les changements de schema, RLS, RPC, Storage ou roles doivent être considérés comme cross-app par défaut.
+
