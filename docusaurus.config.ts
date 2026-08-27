@@ -307,7 +307,7 @@ const config: Config = {
           items: [
             { to: '/docs/guides/getting-started/overview', label: t.nav.gettingStarted },
             { to: '/docs/mobile/build-and-release', label: t.nav.mobile },
-            { to: '/docs/guides/architecture/website-architecture', label: t.nav.website },
+            { to: '/docs/website', label: t.nav.website },
             { to: '/docs/workflows/overview', label: t.nav.workflows },
           ],
         },
