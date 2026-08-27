@@ -99,20 +99,8 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'website/index' },
       items: [
         'guides/architecture/website-architecture',
-        {
-          type: 'category',
-          label: labels.staffPortal,
-          collapsed: false,
-          link: { type: 'generated-index', title: labels.staffPortal },
-          items: [],
-        },
-        {
-          type: 'category',
-          label: labels.clientPortal,
-          collapsed: false,
-          link: { type: 'generated-index', title: labels.clientPortal },
-          items: [],
-        },
+        'website/staff-portal',
+        'website/client-portal',
         'website/roles-and-permissions',
       ],
     },
