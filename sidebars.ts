@@ -90,8 +90,11 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: labels.website,
       collapsed: false,
-      link: { type: 'doc', id: 'guides/architecture/website-architecture' },
-      items: ['website/roles-and-permissions'],
+      link: { type: 'doc', id: 'website/index' },
+      items: [
+        'guides/architecture/website-architecture',
+        'website/roles-and-permissions',
+      ],
     },
   ],
 
