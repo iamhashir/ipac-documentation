@@ -8,6 +8,8 @@ const LABELS = {
     architecture: 'Architecture',
     mobile: 'Mobile',
     website: 'website',
+    staffPortal: 'Staff Portal',
+    clientPortal: 'Client Portal',
     crossAppWorkflows: 'Cross-application workflows',
   },
   fr: {
@@ -15,6 +17,8 @@ const LABELS = {
     architecture: 'Architecture',
     mobile: 'Mobile',
     website: 'website',
+    staffPortal: 'Staff Portal',
+    clientPortal: 'Client Portal',
     crossAppWorkflows: 'Flux inter-applications',
   },
   ar: {
@@ -22,6 +26,8 @@ const LABELS = {
     architecture: 'الهندسة',
     mobile: 'Mobile',
     website: 'website',
+    staffPortal: 'Staff Portal',
+    clientPortal: 'Client Portal',
     crossAppWorkflows: 'سير العمل بين التطبيقات',
   },
 } as const;
@@ -93,6 +99,20 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'website/index' },
       items: [
         'guides/architecture/website-architecture',
+        {
+          type: 'category',
+          label: labels.staffPortal,
+          collapsed: false,
+          link: { type: 'generated-index', title: labels.staffPortal },
+          items: [],
+        },
+        {
+          type: 'category',
+          label: labels.clientPortal,
+          collapsed: false,
+          link: { type: 'generated-index', title: labels.clientPortal },
+          items: [],
+        },
         'website/roles-and-permissions',
       ],
     },
