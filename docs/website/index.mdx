@@ -1,0 +1,71 @@
+---
+title: website
+sidebar_label: Overview
+description: Entry point for documentation about the IPAC website application.
+slug: /website/
+---
+
+# website
+
+This section covers the `ipacapps/website` application. It is the web application
+for IPAC operations and client-facing portal routes, backed by the shared Supabase
+project.
+
+<Status
+  type="verified"
+  date="2026-08-27"
+  sources={[
+    'website:package.json',
+    'website:src/routes/',
+    'website:AGENTS.md',
+  ]}>
+  The application repository, current package manifest, and route tree were checked
+  before setting up this section. This page is an entry point; detailed claims live
+  on the pages linked below.
+</Status>
+
+## Start here
+
+- [Architecture](/docs/guides/architecture/website-architecture) — stack, routing,
+  data access, server surface, layering, authorization boundary, and testing.
+- [Roles and permissions](./roles-and-permissions) — the role checks used by the
+  website and how they differ from the other enforcement points in IPAC.
+- [website troubleshooting](/docs/troubleshooting/website) — verified build,
+  configuration, redirect, and deployment problems.
+
+## Current stack
+
+The current `website/package.json` uses React 19, TanStack Start, TanStack Router,
+TanStack Query, Vite 7, Supabase JS, Tailwind CSS 4, DaisyUI, Zod, Vitest, Biome,
+and TypeScript.
+
+<SourceRef repo="website" path="package.json" />
+
+Do not use this page as a substitute for the package manifest when exact versions
+matter.
+
+## Documentation boundary
+
+Keep application-specific material in this section. Shared system material belongs
+in the existing cross-application sections:
+
+- [Backend](/docs/backend/database-model) — shared Supabase database and backend
+  behavior.
+- [Security](/docs/security/model) — authorization and security findings across the
+  system.
+- [Workflows](/docs/workflows/overview) — end-to-end behavior that crosses website,
+  Mobile, and Supabase.
+- [Architecture](/docs/guides/architecture/system-overview) — the overall system
+  and the relationship between the applications.
+
+Do not duplicate those pages here. Link to them and keep one canonical explanation.
+
+## Source of truth
+
+For website behavior, verify the current `ipacapps/website` source before changing
+this documentation. If source and documentation disagree, do not smooth over the
+contradiction with generated prose: identify the mismatch and update the docs only
+from verified evidence.
+
+Per the repository AI authorship policy in `AGENTS.md`, an AI assistant must not
+invent or fill documentation prose merely to make this section look complete.
