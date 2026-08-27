@@ -71,7 +71,6 @@ state before changing anything.
 | A packer cannot start or resume a session | `packer_sessions` policies, especially temporary authenticated access | [Live verification](/docs/backend/live-verification#high-signal-live-policy-facts) |
 | Package photos taken in the field do not appear in reports | Mobile writes `order_media`, but no live `order_media` bucket exists | [H2](/docs/security/findings#h2) |
 | A client report shows the wrong number of boxes, or wrong dates | `fetch_report_instances` date-mode logic | [W6](/docs/workflows/w6-packing-evidence#the-report-date-rule) |
-| A role can do something it should not, or vice versa | Live role rows plus four divergent source checks | [Roles and permissions](/docs/website/roles-and-permissions) |
 | An order status value is rejected or ignored | The status columns are unconstrained strings with no declared vocabulary | [OQ-012](/docs/reference/open-questions#oq-012) |
 
 :::
