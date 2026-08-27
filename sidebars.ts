@@ -76,7 +76,6 @@ const sidebars: SidebarsConfig = {
       items: [
         'guides/architecture/shared-backend-model',
         'guides/architecture/cross-app',
-        'guides/architecture/website-architecture',
         'guides/architecture/mobile-architecture',
         'guides/architecture/trigger-driven-behaviour',
         'guides/architecture/cross-app-impact-checklist',
@@ -98,10 +97,8 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       link: { type: 'doc', id: 'website/index' },
       items: [
-        'guides/architecture/website-architecture',
         'website/staff-portal',
         'website/client-portal',
-        'website/roles-and-permissions',
       ],
     },
   ],
