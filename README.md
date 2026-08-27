@@ -64,14 +64,19 @@ empty placeholders. See `sidebars.ts`.
 
 ## Writing rules
 
-Three rules, and they are the point of this repository:
+Four rules, and they are the point of this repository:
 
-1. **Invent nothing.** Every claim must come from the application repositories,
+1. **AI does not author documentation by default.** AI assistants may inspect,
+   verify, identify problems, and propose what should change, but they must not
+   write, rewrite, expand, or polish documentation prose unless the user has
+   explicitly approved that writing first. When new wording is needed, ask
+   before writing it. See `AGENTS.md` for the repository-level AI policy.
+2. **Invent nothing.** Every claim must come from the application repositories,
    the live database, or cited existing documentation.
-2. **Declare your confidence.** Every page carries a status banner —
+3. **Declare your confidence.** Every page carries a status banner —
    `verified`, `partial`, or `open-question` — with a date and the sources
    checked. See `docs/reference/documentation-status.mdx`.
-3. **Never resolve a contradiction by guessing.** Record it in
+4. **Never resolve a contradiction by guessing.** Record it in
    `docs/reference/open-questions.mdx` with a stable ID, and mark the affected
    page.
 
