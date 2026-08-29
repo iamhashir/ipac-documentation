@@ -1,0 +1,68 @@
+---
+title: "website"
+sidebar_label: "Overview"
+description: "Entry point لـ documentation about ال IPAC website التطبيق."
+slug: /website/
+---
+
+# website {#website}
+
+This section covers ال `ipacapps/website` التطبيق. It هو ال web التطبيق
+لـ IPAC operations و client-facing portal routes, backed بواسطة ال مشترك Supabase
+project.
+
+<Status
+  type="verified"
+  date="2026-08-27"
+  sources={[
+    'website:package.json',
+    'website:src/routes/',
+    'website:AGENTS.md',
+  ]}>
+  ال التطبيق المستودع, الحالي package manifest, و route tree تم تم التحقق
+  قبل setting up this section. This page هو an entry point; detailed claims live
+  on ال pages linked below.
+</Status>
+
+## Start here {#start-here}
+
+- [website troubleshooting](/docs/troubleshooting/website) — تم التحقق build,
+  الإعداد, redirect, و النشر problems.
+
+## الحالي stack {#current-stack}
+
+ال الحالي `website/package.json` يستخدم React 19, TanStack Start, TanStack Router,
+TanStack Query, Vite 7, Supabase JS, Tailwind CSS 4, DaisyUI, Zod, Vitest, Biome,
+و TypeScript.
+
+<SourceRef repo="website" path="package.json" />
+
+Do لا use this page as a substitute لـ ال package manifest عندما exact versions
+matter.
+
+## Documentation boundary {#documentation-boundary}
+
+Keep application-specific material في this section. مشترك system material belongs
+في ال الموجود cross-application sections:
+
+- [Backend](/docs/backend/database-model) — مشترك Supabase قاعدة البيانات و backend
+  behavior.
+- [Security](/docs/security/model) — التفويض و الأمان findings across ال
+  system.
+- [Workflows](/docs/workflows/overview) — end-إلى-end behavior that crosses website,
+  Mobile, و Supabase.
+- [Architecture](/docs/guides/architecture/system-overview) — ال overall system
+  و ال relationship between ال التطبيقات.
+
+Do لا duplicate those pages here. Link إلى them و keep one canonical explanation.
+
+## المصدر من truth {#source-of-truth}
+
+لـ website behavior, تحقق ال الحالي `ipacapps/website` المصدر قبل changing
+this documentation. إذا المصدر و documentation disagree, do لا smooth over ال
+contradiction مع generated prose: identify ال mismatch و update ال docs only
+من تم التحقق الدليل.
+
+Per ال المستودع AI authorship policy في `AGENTS.md`, an AI assistant يجب لا
+invent أو fill documentation prose merely إلى make this section look complete.
+

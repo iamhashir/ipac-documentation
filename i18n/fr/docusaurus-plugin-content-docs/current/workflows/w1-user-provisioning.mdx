@@ -68,7 +68,7 @@ sequenceDiagram
 le fonction permits **`director` ou `admin` only**. Notably it also selects
 `roles.can_manage_roles` et then **never utilise it** — le decision est a hardcoded
 role-name comparison. See
-[Rôles et permissions](/docs/website/roles-and-permissions#permission-flags-are-database-side-only).
+[Rôles et permissions](/docs/website/).
 
 Any rôle name present dans le `roles` table peut be **assigned**, parce que le
 fonction looks le name up rather than validating against a list. Live assignable

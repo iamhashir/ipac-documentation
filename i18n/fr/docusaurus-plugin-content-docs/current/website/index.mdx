@@ -1,0 +1,68 @@
+---
+title: "website"
+sidebar_label: "Overview"
+description: "Entry point pour documentation about le IPAC website application."
+slug: /website/
+---
+
+# website {#website}
+
+This section covers le `ipacapps/website` application. It est le web application
+pour IPAC operations et client-facing portal routes, backed par le partagé Supabase
+project.
+
+<Status
+  type="verified"
+  date="2026-08-27"
+  sources={[
+    'website:package.json',
+    'website:src/routes/',
+    'website:AGENTS.md',
+  ]}>
+  le application dépôt, actuel package manifest, et route tree ont été vérifié
+  avant setting up this section. This page est an entry point; detailed claims live
+  on le pages linked below.
+</Status>
+
+## Start here {#start-here}
+
+- [website troubleshooting](/docs/troubleshooting/website) — vérifié build,
+  configuration, redirect, et déploiement problems.
+
+## Actuel stack {#current-stack}
+
+le actuel `website/package.json` utilise React 19, TanStack Start, TanStack Router,
+TanStack Query, Vite 7, Supabase JS, Tailwind CSS 4, DaisyUI, Zod, Vitest, Biome,
+et TypeScript.
+
+<SourceRef repo="website" path="package.json" />
+
+Do ne use this page as a substitute pour le package manifest quand exact versions
+matter.
+
+## Documentation boundary {#documentation-boundary}
+
+Keep application-specific material dans this section. Partagé system material belongs
+dans le existant cross-application sections:
+
+- [Backend](/docs/backend/database-model) — partagé Supabase base de données et backend
+  behavior.
+- [Security](/docs/security/model) — autorisation et sécurité findings across le
+  system.
+- [Workflows](/docs/workflows/overview) — end-vers-end behavior that crosses website,
+  Mobile, et Supabase.
+- [Architecture](/docs/guides/architecture/system-overview) — le overall system
+  et le relationship between le applications.
+
+Do ne duplicate those pages here. Link vers them et keep one canonical explanation.
+
+## Source de truth {#source-of-truth}
+
+pour website behavior, vérifier le actuel `ipacapps/website` source avant changing
+this documentation. Si source et documentation disagree, do ne smooth over le
+contradiction avec generated prose: identify le mismatch et update le docs only
+depuis vérifié preuve.
+
+Per le dépôt AI authorship policy dans `AGENTS.md`, an AI assistant doit ne
+invent ou fill documentation prose merely vers make this section look complete.
+

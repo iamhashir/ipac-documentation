@@ -166,7 +166,7 @@ Rules that both applications depend on but neither owns:
 | Rule | Where it lives | Confidence |
 | --- | --- | --- |
 | Username sign-in resolves through one RPC | database function, called by both | VERIFIED |
-| Role name decides application access | duplicated in four places, inconsistently | VERIFIED — see [Roles and permissions](/docs/website/roles-and-permissions) |
+| Role name decides application access | duplicated in four places, inconsistently | VERIFIED — see [Roles and permissions](/docs/website/) |
 | Team-lead status is **per order**, not a global role | `order_team_members.is_team_lead` | VERIFIED |
 | Team leads may manage attendance for their order | `can_user_mark_attendance`, `SECURITY DEFINER` | VERIFIED |
 | A packer has at most one active order | live `order_team_members` trigger `trigger_enforce_single_active_order_for_packer` | VERIFIED |

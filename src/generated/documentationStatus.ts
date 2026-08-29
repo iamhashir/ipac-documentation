@@ -177,20 +177,6 @@ export const documentationStatus = [
     ]
   },
   {
-    "id": "guides/architecture/website-architecture",
-    "title": "website architecture",
-    "type": "verified",
-    "date": "2026-08-19",
-    "sources": [
-      "website:package.json",
-      "website:src/routes/",
-      "website:src/",
-      "website:server/api/",
-      "website:CLAUDE.md",
-      "website:docs/ARCHITECTURE.md"
-    ]
-  },
-  {
     "id": "guides/getting-started/environment-variables",
     "title": "Environment variables",
     "type": "partial",
@@ -433,21 +419,29 @@ export const documentationStatus = [
     ]
   },
   {
-    "id": "website/roles-and-permissions",
-    "title": "Roles and permissions",
-    "type": "partial",
-    "date": "2026-08-20",
+    "id": "website/client-portal",
+    "title": "Client Portal",
+    "type": "open-question",
+    "date": "2026-08-27",
+    "sources": []
+  },
+  {
+    "id": "website/index",
+    "title": "website",
+    "type": "verified",
+    "date": "2026-08-27",
     "sources": [
-      "website:src/lib/access.ts",
-      "website:src/hooks/usePageAccess.ts",
-      "Mobile:app/index.tsx",
-      "Mobile:app/(admin)/_layout.tsx",
-      "Mobile:app/(packer)/_layout.tsx",
-      "Mobile:supabase/functions/create-user/index.ts",
-      "Mobile:supabase/migrations/20250121_add_team_lead_support.sql",
-      "website:src/types/supabase.ts",
-      "Supabase project fqynbudvpvpiljdrrvem"
+      "website:package.json",
+      "website:src/routes/",
+      "website:AGENTS.md"
     ]
+  },
+  {
+    "id": "website/staff-portal",
+    "title": "Staff Portal",
+    "type": "open-question",
+    "date": "2026-08-27",
+    "sources": []
   },
   {
     "id": "workflows/overview",
@@ -538,11 +532,11 @@ export const documentationStatus = [
 ] as const satisfies readonly DocumentationStatusEntry[];
 
 export const documentationStatusSummary = {
-  total: 41,
+  total: 42,
   verified: 30,
   verifiedLive: 18,
   verifiedSource: 12,
-  partial: 10,
-  openQuestion: 1,
+  partial: 9,
+  openQuestion: 3,
   latestLiveBackendVerification: "2026-08-20",
 } as const;

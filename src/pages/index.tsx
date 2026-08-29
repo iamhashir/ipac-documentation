@@ -91,7 +91,7 @@ const COPY = {
         links: [
           {label: 'Security Model', to: '/docs/security/model'},
           {label: 'Security Findings', to: '/docs/security/findings'},
-          {label: 'Roles & Permissions', to: '/docs/website/roles-and-permissions'},
+          {label: 'Roles & Permissions', to: '/docs/website/'},
           {label: 'ADRs', to: '/docs/adr/overview'},
         ],
       },
@@ -134,7 +134,7 @@ const COPY = {
         links: [
           {label: 'Security Model', to: '/docs/security/model'},
           {label: 'Findings', to: '/docs/security/findings'},
-          {label: 'Roles', to: '/docs/website/roles-and-permissions'},
+          {label: 'Roles', to: '/docs/website/'},
         ],
       },
       {
@@ -232,7 +232,7 @@ const COPY = {
         links: [
           {label: 'Modèle de sécurité', to: '/docs/security/model'},
           {label: 'Findings sécurité', to: '/docs/security/findings'},
-          {label: 'Rôles et permissions', to: '/docs/website/roles-and-permissions'},
+          {label: 'Rôles et permissions', to: '/docs/website/'},
           {label: 'ADR', to: '/docs/adr/overview'},
         ],
       },
@@ -275,7 +275,7 @@ const COPY = {
         links: [
           {label: 'Modèle sécurité', to: '/docs/security/model'},
           {label: 'Findings', to: '/docs/security/findings'},
-          {label: 'Rôles', to: '/docs/website/roles-and-permissions'},
+          {label: 'Rôles', to: '/docs/website/'},
         ],
       },
       {
@@ -373,7 +373,7 @@ const COPY = {
         links: [
           {label: 'نموذج الأمان', to: '/docs/security/model'},
           {label: 'Security findings', to: '/docs/security/findings'},
-          {label: 'الأدوار والصلاحيات', to: '/docs/website/roles-and-permissions'},
+          {label: 'الأدوار والصلاحيات', to: '/docs/website/'},
           {label: 'ADR', to: '/docs/adr/overview'},
         ],
       },
@@ -416,7 +416,7 @@ const COPY = {
         links: [
           {label: 'نموذج الأمان', to: '/docs/security/model'},
           {label: 'Findings', to: '/docs/security/findings'},
-          {label: 'الأدوار', to: '/docs/website/roles-and-permissions'},
+          {label: 'الأدوار', to: '/docs/website/'},
         ],
       },
       {
@@ -520,7 +520,7 @@ function ArchitectureVisual({copy}: {copy: HomeCopy}): ReactNode {
         <Link to="/docs/backend/database-model#functions">RPC / Functions</Link>
       </div>
       <div className={styles.upArrow} aria-hidden="true" />
-      <Link className={styles.clientNode} to="/docs/guides/architecture/website-architecture">
+      <Link className={styles.clientNode} to="/docs/website/">
         {copy.architecture.website}
       </Link>
       <div className={styles.upArrow} aria-hidden="true" />

@@ -125,7 +125,7 @@ but that is inference and is not documented as a comparison.
 - **Duplicated domain logic.** Both applications independently construct Supabase
   queries against the same 26 shared tables, and both hardcode role checks — see
   [ADR-0003](./adr-0003-report-packed-date) and
-  [Roles and permissions](/docs/website/roles-and-permissions).
+  [Roles and permissions](/docs/website/).
 - **The old surface was not removed.** Administrative screens still exist in `Mobile`,
   so for some workflows it is unclear which application is authoritative.
 
@@ -171,7 +171,7 @@ The decision is settled. Two of its consequences are not:
 
 ## Related Documentation
 
-- [website architecture](/docs/guides/architecture/website-architecture)
+- [website architecture](/docs/website/)
 - [Mobile architecture](/docs/guides/architecture/mobile-architecture)
 - [Cross-application architecture](/docs/guides/architecture/cross-app)
 - [ADR-0002 — Repository migration](./adr-0002-repository-migration)

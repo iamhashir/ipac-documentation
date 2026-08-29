@@ -10,7 +10,7 @@ interface RelatedDoc {
 
 const RELATED_BY_ID: Record<string, readonly RelatedDoc[]> = {
   'security/model': [
-    {title: 'Roles & Permissions', to: '/docs/website/roles-and-permissions', reason: 'role enforcement'},
+    {title: 'Roles & Permissions', to: '/docs/website/', reason: 'role enforcement'},
     {title: 'Security Findings', to: '/docs/security/findings', reason: 'active risks'},
     {title: 'Database Model', to: '/docs/backend/database-model', reason: 'RLS and functions'},
   ],
